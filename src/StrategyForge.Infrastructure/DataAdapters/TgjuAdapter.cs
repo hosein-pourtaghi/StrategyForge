@@ -6,6 +6,7 @@ using StrategyForge.Domain.Configuration;
 using StrategyForge.Domain.Enums;
 using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
+using StrategyForge.Infrastructure.Authentication;
 using StrategyForge.Infrastructure.Services;
 
 namespace StrategyForge.Infrastructure.DataAdapters;
@@ -13,11 +14,8 @@ namespace StrategyForge.Infrastructure.DataAdapters;
 /// <summary>
 /// Data source adapter for TGJU (tgju.org) — free-market FX rates and gold prices.
 /// 
-/// TGJU provides:
-/// - Free-market USD/IRR, EUR/IRR rates
-/// - Gold prices (mesghal, 18k, 24k)
-/// - Cryptocurrency rates
-/// - Historical market charts
+/// TGJU public endpoints: Authentication = None
+/// TGJU authenticated Web Service: Authentication = ApiKey (future)
 /// 
 /// Free-market rates must always be explicitly labeled as free-market rates
 /// and must never be represented as official government rates.
@@ -27,7 +25,6 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
     public override SourceAdapterType SourceType => SourceAdapterType.Tgju;
     public override IReadOnlyList<string> Domains { get; } = ["tgju.org"];
 
-    // TGJU symbol mappings for known instruments
     private static readonly Dictionary<string, string> TgjuSymbols = new(StringComparer.OrdinalIgnoreCase)
     {
         ["USD-IRR"] = "price_dollar_rl",
@@ -45,8 +42,9 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
         ILogger<TgjuAdapter> logger,
         RateLimiter rateLimiter,
         InMemoryDataCache cache,
-        DataQualityValidator qualityValidator)
-        : base(httpClient, settings, logger, rateLimiter, cache, qualityValidator, "tgju")
+        DataQualityValidator qualityValidator,
+        IDataSourceAuthenticator authenticator)
+        : base(httpClient, settings, logger, rateLimiter, cache, qualityValidator, authenticator, "tgju")
     {
     }
 
@@ -61,8 +59,6 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
         DateOnly to,
         CancellationToken cancellationToken)
     {
-        // TGJU historical chart endpoint
-        // Format: /market/{symbol} historical data
         var url = $"/market/{sourceInstrumentId}";
 
         Logger.LogDebug("Fetching TGJU historical data: {Url}", url);
@@ -80,7 +76,6 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         CancellationToken cancellationToken)
     {
-        // TGJU current rate endpoint
         var url = $"/market/{sourceInstrumentId}";
 
         Logger.LogDebug("Fetching TGJU latest rate: {Url}", url);
@@ -107,7 +102,6 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
         if (!json.RootElement.TryGetProperty("items", out var items) &&
             !json.RootElement.TryGetProperty("data", out items))
         {
-            // Try single-item response
             if (json.RootElement.TryGetProperty("price", out var priceProp) ||
                 json.RootElement.TryGetProperty("p", out priceProp))
             {
@@ -145,14 +139,6 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
 
     private Candle? ParseTgjuItem(JsonElement item, string symbol)
     {
-        // TGJU items typically have:
-        // d: date string
-        // p: price
-        // h: high
-        // l: low
-        // t: time
-        // or: { price, time, ... }
-
         var price = GetDecimal(item, "p") ?? GetDecimal(item, "price");
         if (price == null || price <= 0)
             return null;
@@ -178,7 +164,7 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
             High = high.Value,
             Low = low.Value,
             Close = price.Value,
-            Volume = 0, // TGJU doesn't provide volume for FX rates
+            Volume = 0,
             MarketTimezone = "Asia/Tehran",
             Adjustment = DataAdjustment.Unadjusted,
             Provenance = new DataProvenance
@@ -199,11 +185,9 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
 
     private static DateOnly ParseDate(string dateStr)
     {
-        // Try common formats
         if (DateOnly.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             return date;
 
-        // Try Unix timestamp
         if (long.TryParse(dateStr, out var timestamp))
         {
             var dt = DateTimeOffset.FromUnixTimeSeconds(timestamp);

@@ -6,6 +6,7 @@ using StrategyForge.Domain.Configuration;
 using StrategyForge.Domain.Enums;
 using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
+using StrategyForge.Infrastructure.Authentication;
 using StrategyForge.Infrastructure.Services;
 
 namespace StrategyForge.Infrastructure.DataAdapters;
@@ -14,8 +15,8 @@ namespace StrategyForge.Infrastructure.DataAdapters;
 /// Data source adapter for the Central Bank of Iran (CBI).
 /// Provides official government FX reference rates.
 /// 
+/// CBI public reference-rate endpoints: Authentication = None
 /// Official rates must always remain distinguishable from free-market rates.
-/// Never use official and free-market rates interchangeably.
 /// </summary>
 public sealed class CbiAdapter : BaseDataSourceAdapter
 {
@@ -28,33 +29,29 @@ public sealed class CbiAdapter : BaseDataSourceAdapter
         ILogger<CbiAdapter> logger,
         RateLimiter rateLimiter,
         InMemoryDataCache cache,
-        DataQualityValidator qualityValidator)
-        : base(httpClient, settings, logger, rateLimiter, cache, qualityValidator, "cbi")
+        DataQualityValidator qualityValidator,
+        IDataSourceAuthenticator authenticator)
+        : base(httpClient, settings, logger, rateLimiter, cache, qualityValidator, authenticator, "cbi")
     {
     }
 
     protected override bool CanSupportInstrument(InstrumentMapping instrument) =>
         instrument.AssetClass == AssetType.Currency;
 
-    protected override async Task<IReadOnlyList<Candle>> FetchCandlesFromSourceAsync(
+    protected override Task<IReadOnlyList<Candle>> FetchCandlesFromSourceAsync(
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
         CancellationToken cancellationToken)
     {
-        // CBI does not typically provide historical daily candle data in the same format
-        // We can fetch current rates and return them as a single-point candle
-        // For historical data, other sources (TGJU) are more suitable
         Logger.LogDebug("CBI adapter: historical candle data not directly available");
-
-        return [];
+        return Task.FromResult<IReadOnlyList<Candle>>([]);
     }
 
     protected override async Task<Candle?> FetchLatestCandleFromSourceAsync(
         string sourceInstrumentId,
         CancellationToken cancellationToken)
     {
-        // CBI current exchange rate page
         var url = $"/apps/Currency";
 
         Logger.LogDebug("Fetching CBI official rates: {Url}", url);
@@ -70,8 +67,6 @@ public sealed class CbiAdapter : BaseDataSourceAdapter
 
     private Candle? ParseCbiRate(JsonDocument json, string currencyCode)
     {
-        // CBI API returns rates in various formats
-        // Try to find the requested currency
         if (json.RootElement.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in json.RootElement.EnumerateArray())

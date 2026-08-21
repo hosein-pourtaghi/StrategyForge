@@ -1,43 +1,64 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Options;
+using StrategyForge.Domain.Configuration;
 
 namespace StrategyForge.Infrastructure.Services;
 
 /// <summary>
-/// Token-bucket rate limiter for HTTP requests.
-/// Limits requests per domain to respect provider rate limits.
+/// Window-based rate limiter per source with configurable limits.
+/// Configuration hierarchy:
+///   Source-specific RateLimit settings → Global DefaultRateLimit → built-in safe fallback (10/min).
 /// Thread-safe and suitable for concurrent use.
 /// </summary>
 public sealed class RateLimiter : IDisposable
 {
-    private readonly ConcurrentDictionary<string, TokenBucket> _buckets = new();
-    private readonly double _defaultRate;
-    private Timer? _refillTimer;
+    private readonly ConcurrentDictionary<string, SlidingWindowBucket> _buckets = new();
+    private readonly IOptions<DataSourceSettings> _settings;
+    private Timer? _cleanupTimer;
 
-    /// <summary>
-    /// Creates a new rate limiter.
-    /// </summary>
-    /// <param name="defaultRatePerSecond">Default requests per second per domain.</param>
-    public RateLimiter(double defaultRatePerSecond = 1.0)
+    public RateLimiter(IOptions<DataSourceSettings> settings)
     {
-        _defaultRate = defaultRatePerSecond;
-        // Refill tokens every 100ms for smooth rate limiting
-        _refillTimer = new Timer(RefillAll, null, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
+        _settings = settings;
+        _cleanupTimer = new Timer(Cleanup, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     /// <summary>
-    /// Waits until a request slot is available for the given domain.
-    /// Respects the configured rate limit.
+    /// Resolves the effective rate limit for a given source key.
+    /// Hierarchy: source-specific → global default → built-in fallback.
     /// </summary>
-    /// <param name="domain">The domain to rate-limit against.</param>
-    /// <param name="ratePerSecond">Override rate for this domain.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
+    public RateLimitSettings GetEffectiveRateLimit(string sourceKey)
+    {
+        var config = _settings.Value;
+
+        // 1. Check source-specific override
+        if (config.Sources.TryGetValue(sourceKey, out var sourceConfig) && sourceConfig.RateLimit != null && sourceConfig.RateLimit.IsValid)
+        {
+            return sourceConfig.RateLimit;
+        }
+
+        // 2. Global default
+        if (config.DefaultRateLimit != null && config.DefaultRateLimit.IsValid)
+        {
+            return config.DefaultRateLimit;
+        }
+
+        // 3. Built-in safe fallback: 10 requests per minute
+        return RateLimitSettings.Default;
+    }
+
+    /// <summary>
+    /// Waits until a request slot is available for the given source.
+    /// Uses sliding-window rate limiting based on configured limits.
+    /// </summary>
     public async Task WaitForSlotAsync(
-        string domain,
-        double? ratePerSecond = null,
+        string sourceKey,
         CancellationToken cancellationToken = default)
     {
-        var rate = ratePerSecond ?? _defaultRate;
-        var bucket = _buckets.GetOrAdd(domain, _ => new TokenBucket(rate));
+        var settings = GetEffectiveRateLimit(sourceKey);
+        var bucket = _buckets.GetOrAdd(sourceKey, _ => new SlidingWindowBucket(settings));
+
+        // If config changed, update the bucket
+        bucket.UpdateSettings(settings);
 
         while (true)
         {
@@ -46,74 +67,102 @@ public sealed class RateLimiter : IDisposable
             if (bucket.TryTake())
                 return;
 
-            // Wait until next token is available
-            var waitMs = bucket.TimeUntilNextToken();
+            var waitMs = bucket.TimeUntilNextSlot();
             await Task.Delay(Math.Max(1, (int)waitMs), cancellationToken);
         }
     }
 
-    private void RefillAll(object? state)
+    private void Cleanup(object? state)
     {
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        foreach (var bucket in _buckets.Values)
+        var cutoff = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var keysToRemove = _buckets
+            .Where(kvp => kvp.Value.LastAccess < cutoff)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in keysToRemove)
         {
-            bucket.Refill(now);
+            _buckets.TryRemove(key, out _);
         }
     }
 
     public void Dispose()
     {
-        _refillTimer?.Dispose();
-        _refillTimer = null;
+        _cleanupTimer?.Dispose();
+        _cleanupTimer = null;
     }
 }
 
 /// <summary>
-/// Token bucket for a single domain.
+/// Sliding window rate-limit bucket for a single source.
+/// Tracks requests within a configurable time window.
 /// </summary>
-internal sealed class TokenBucket
+internal sealed class SlidingWindowBucket
 {
-    private readonly double _ratePerMs;
-    private readonly int _maxTokens;
-    private double _tokens;
-    private long _lastRefillMs;
+    private readonly object _lock = new();
+    private readonly Queue<DateTimeOffset> _timestamps = new();
+    private RateLimitSettings _settings;
+    private DateTimeOffset _lastAccess;
 
-    public TokenBucket(double ratePerSecond, int maxBurst = 5)
+    public DateTimeOffset LastAccess
     {
-        _ratePerMs = ratePerSecond / 1000.0;
-        _maxTokens = maxBurst;
-        _tokens = maxBurst;
-        _lastRefillMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        get { lock (_lock) return _lastAccess; }
+    }
+
+    public SlidingWindowBucket(RateLimitSettings settings)
+    {
+        _settings = settings;
+        _lastAccess = DateTimeOffset.UtcNow;
+    }
+
+    public void UpdateSettings(RateLimitSettings settings)
+    {
+        lock (_lock)
+        {
+            _settings = settings;
+        }
     }
 
     public bool TryTake()
     {
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        Refill(now);
-
-        if (_tokens >= 1.0)
+        lock (_lock)
         {
-            _tokens -= 1.0;
-            return true;
+            _lastAccess = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.UtcNow;
+            var windowStart = now - _settings.Window;
+
+            // Remove expired timestamps
+            while (_timestamps.Count > 0 && _timestamps.Peek() < windowStart)
+            {
+                _timestamps.Dequeue();
+            }
+
+            if (_timestamps.Count < _settings.MaxRequests)
+            {
+                _timestamps.Enqueue(now);
+                return true;
+            }
+
+            return false;
         }
-        return false;
     }
 
-    public double TimeUntilNextToken()
+    public double TimeUntilNextSlot()
     {
-        if (_tokens >= 1.0)
-            return 0;
+        lock (_lock)
+        {
+            if (_timestamps.Count == 0)
+                return 0;
 
-        var needed = 1.0 - _tokens;
-        return needed / _ratePerMs;
-    }
+            var windowStart = DateTimeOffset.UtcNow - _settings.Window;
+            var oldestInWindow = _timestamps.Peek();
 
-    public void Refill(long nowMs)
-    {
-        var elapsed = nowMs - _lastRefillMs;
-        if (elapsed <= 0) return;
+            if (oldestInWindow < windowStart)
+                return 0;
 
-        _tokens = Math.Min(_maxTokens, _tokens + elapsed * _ratePerMs);
-        _lastRefillMs = nowMs;
+            var waitUntil = oldestInWindow + _settings.Window;
+            var waitMs = (waitUntil - DateTimeOffset.UtcNow).TotalMilliseconds;
+            return Math.Max(0, waitMs);
+        }
     }
 }

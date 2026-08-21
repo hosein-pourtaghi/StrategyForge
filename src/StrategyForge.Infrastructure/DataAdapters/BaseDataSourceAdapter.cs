@@ -6,13 +6,14 @@ using StrategyForge.Domain.Configuration;
 using StrategyForge.Domain.Enums;
 using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
+using StrategyForge.Infrastructure.Authentication;
 using StrategyForge.Infrastructure.Services;
 
 namespace StrategyForge.Infrastructure.DataAdapters;
 
 /// <summary>
 /// Base class for all data source adapters.
-/// Provides common HTTP handling, rate limiting, retry logic, caching,
+/// Provides common HTTP handling, authentication, rate limiting, retry logic, caching,
 /// and response normalization.
 /// </summary>
 public abstract class BaseDataSourceAdapter : IDataSourceAdapter
@@ -22,6 +23,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
     protected readonly RateLimiter RateLimiter;
     protected readonly InMemoryDataCache Cache;
     protected readonly DataQualityValidator QualityValidator;
+    protected readonly IDataSourceAuthenticator Authenticator;
     protected readonly SourceAdapterConfig Config;
     protected readonly DataSourceSettings GlobalSettings;
 
@@ -39,6 +41,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
         RateLimiter rateLimiter,
         InMemoryDataCache cache,
         DataQualityValidator qualityValidator,
+        IDataSourceAuthenticator authenticator,
         string configKey)
     {
         HttpClient = httpClient;
@@ -46,6 +49,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
         RateLimiter = rateLimiter;
         Cache = cache;
         QualityValidator = qualityValidator;
+        Authenticator = authenticator;
         GlobalSettings = settings.Value;
 
         if (!settings.Value.Sources.TryGetValue(configKey, out var sourceConfig))
@@ -64,8 +68,35 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
         }
     }
 
-    /// <summary>Get the domain for rate limiting from the BaseAddress.</summary>
-    protected string GetDomain() => HttpClient.BaseAddress!.Host;
+    /// <summary>Get the source key for rate limiting.</summary>
+    protected string GetSourceKey() => SourceType.ToString().ToLowerInvariant();
+
+    /// <summary>
+    /// Authenticates an HTTP request if the source requires it.
+    /// Returns an error result if authentication fails; null if successful.
+    /// </summary>
+    protected async Task<DataResult<T>?> AuthenticateRequestAsync<T>(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        var authResult = await Authenticator.AuthenticateAsync(request, Config.Authentication, cancellationToken);
+        if (!authResult.Success)
+        {
+            Logger.LogWarning(
+                "Authentication failed for {Source}: {Code} - {Message}",
+                Name, authResult.ErrorCode, authResult.ErrorMessage);
+
+            return DataResult<T>.Failure(new DataCollectionError2
+            {
+                Code = authResult.ErrorCode ?? "AUTHENTICATION_FAILED",
+                Message = authResult.ErrorMessage ?? "Authentication failed",
+                Retryable = authResult.Retryable,
+                OccurredAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+
+        return null; // null means auth succeeded, continue with request
+    }
 
     // --- Abstract methods for subclasses ---
 
@@ -114,7 +145,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
                 }
 
                 // Rate limit
-                await RateLimiter.WaitForSlotAsync(GetDomain(), Config.RateLimitPerSecond, cancellationToken);
+                await RateLimiter.WaitForSlotAsync(GetSourceKey(), cancellationToken);
 
                 // Fetch from source
                 var sw = Stopwatch.StartNew();
@@ -161,7 +192,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
                 }
 
                 // Rate limit
-                await RateLimiter.WaitForSlotAsync(GetDomain(), Config.RateLimitPerSecond, cancellationToken);
+                await RateLimiter.WaitForSlotAsync(GetSourceKey(), cancellationToken);
 
                 // Fetch from source
                 var sw = Stopwatch.StartNew();

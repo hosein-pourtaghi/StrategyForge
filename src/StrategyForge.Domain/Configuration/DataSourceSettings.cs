@@ -34,8 +34,8 @@ public sealed record DataSourceSettings
     /// <summary>Default cache duration in minutes for market data.</summary>
     public int CacheDurationMinutes { get; init; } = 15;
 
-    /// <summary>Default rate limit: requests per second per domain.</summary>
-    public double DefaultRateLimitPerSecond { get; init; } = 1.0;
+    /// <summary>Default rate limit: requests per minute (configurable).</summary>
+    public RateLimitSettings DefaultRateLimit { get; init; } = RateLimitSettings.Default;
 
     // --- Per-Source Configuration ---
 
@@ -49,9 +49,9 @@ public sealed record DataSourceSettings
                 SourceType = SourceAdapterType.Tsetmc,
                 Enabled = true,
                 BaseUrl = "https://cdn.tsetmc.com",
-                RateLimitPerSecond = 1.0,
                 CacheMinutes = 15,
-                MaxRetries = 3
+                MaxRetries = 3,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
             },
             ["tgju"] = new SourceAdapterConfig
             {
@@ -59,9 +59,9 @@ public sealed record DataSourceSettings
                 SourceType = SourceAdapterType.Tgju,
                 Enabled = true,
                 BaseUrl = "https://tgju.org",
-                RateLimitPerSecond = 1.0,
                 CacheMinutes = 5,
-                MaxRetries = 3
+                MaxRetries = 3,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
             },
             ["rahavard365"] = new SourceAdapterConfig
             {
@@ -69,9 +69,9 @@ public sealed record DataSourceSettings
                 SourceType = SourceAdapterType.Rahavard365,
                 Enabled = true,
                 BaseUrl = "https://rahavard365.com",
-                RateLimitPerSecond = 1.0,
                 CacheMinutes = 15,
-                MaxRetries = 2
+                MaxRetries = 2,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
             },
             ["cbi"] = new SourceAdapterConfig
             {
@@ -79,9 +79,9 @@ public sealed record DataSourceSettings
                 SourceType = SourceAdapterType.Cbi,
                 Enabled = true,
                 BaseUrl = "https://cbi.ir",
-                RateLimitPerSecond = 0.5,
                 CacheMinutes = 60,
-                MaxRetries = 2
+                MaxRetries = 2,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
             }
         };
 }
@@ -103,8 +103,8 @@ public sealed record SourceAdapterConfig
     /// <summary>Base URL for HTTP requests.</summary>
     public required string BaseUrl { get; init; }
 
-    /// <summary>Rate limit: maximum requests per second.</summary>
-    public double RateLimitPerSecond { get; init; } = 1.0;
+    /// <summary>Per-source rate limit override. Falls back to DataSourceSettings.DefaultRateLimit.</summary>
+    public RateLimitSettings? RateLimit { get; init; }
 
     /// <summary>Cache duration in minutes for data from this source.</summary>
     public int CacheMinutes { get; init; } = 15;
@@ -114,6 +114,9 @@ public sealed record SourceAdapterConfig
 
     /// <summary>Request timeout in seconds (overrides global if set).</summary>
     public int? TimeoutSeconds { get; init; }
+
+    /// <summary>Authentication settings for this source.</summary>
+    public AuthenticationSettings Authentication { get; init; } = new() { Mode = AuthenticationMode.None };
 
     /// <summary>Additional source-specific configuration key-value pairs.</summary>
     public IDictionary<string, string> ExtraSettings { get; init; }

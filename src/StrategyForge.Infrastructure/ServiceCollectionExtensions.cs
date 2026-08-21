@@ -1,28 +1,38 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StrategyForge.Domain.Configuration;
 using StrategyForge.Domain.Interfaces.Providers;
+using StrategyForge.Infrastructure.Authentication;
 using StrategyForge.Infrastructure.DataAdapters;
+using StrategyForge.Infrastructure.InstrumentResolution;
 using StrategyForge.Infrastructure.Services;
 
 namespace StrategyForge.Infrastructure;
 
 /// <summary>
 /// DI registration extension for the Infrastructure layer.
-/// Registers data providers, services, adapters, and external integrations.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers StrategyForge Infrastructure services.
-    /// Includes: rate limiter, cache, calendar, quality validator, adapters, registry.
-    /// </summary>
-    public static IServiceCollection AddStrategyForgeInfrastructure(this IServiceCollection services)
+    public static IServiceCollection AddStrategyForgeInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        // --- Configuration ---
+        services.Configure<DataSourceSettings>(configuration.GetSection(DataSourceSettings.SectionName));
+
         // --- Core Infrastructure Services (Singleton) ---
         services.AddSingleton<RateLimiter>();
         services.AddSingleton<InMemoryDataCache>();
         services.AddSingleton<JalaliCalendarService>();
         services.AddSingleton<DataQualityValidator>();
+
+        // --- Authentication ---
+        services.AddSingleton<CredentialResolver>();
+        services.AddSingleton<IDataSourceAuthenticator, CompositeDataSourceAuthenticator>();
+
+        // --- Instrument Resolver ---
+        services.AddSingleton<IInstrumentResolver, InMemoryInstrumentResolver>();
 
         // --- Named HttpClients for each adapter ---
         services.AddHttpClient("tsetmc");
@@ -30,7 +40,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("cbi");
 
         // --- Source Adapters ---
-        // Each adapter gets its own named HttpClient via factory
         services.AddTransient<TsetmcAdapter>(sp =>
         {
             var factory = sp.GetRequiredService<IHttpClientFactory>();
@@ -42,6 +51,7 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<RateLimiter>(),
                 sp.GetRequiredService<InMemoryDataCache>(),
                 sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>(),
                 sp.GetRequiredService<JalaliCalendarService>());
         });
 
@@ -55,7 +65,8 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<TgjuAdapter>>(),
                 sp.GetRequiredService<RateLimiter>(),
                 sp.GetRequiredService<InMemoryDataCache>(),
-                sp.GetRequiredService<DataQualityValidator>());
+                sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>());
         });
 
         services.AddTransient<CbiAdapter>(sp =>
@@ -68,15 +79,15 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CbiAdapter>>(),
                 sp.GetRequiredService<RateLimiter>(),
                 sp.GetRequiredService<InMemoryDataCache>(),
-                sp.GetRequiredService<DataQualityValidator>());
+                sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>());
         });
 
-        // Register adapters under IDataSourceAdapter for IEnumerable injection
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<TsetmcAdapter>());
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<TgjuAdapter>());
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<CbiAdapter>());
 
-        // --- Registry (Singleton — coordinates adapters) ---
+        // --- Registry ---
         services.AddSingleton<IDataSourceRegistry, DataSourceRegistry>();
 
         return services;
