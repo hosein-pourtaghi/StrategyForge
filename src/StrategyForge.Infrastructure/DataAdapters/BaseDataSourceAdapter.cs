@@ -1,0 +1,353 @@
+using System.Diagnostics;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using StrategyForge.Domain.Configuration;
+using StrategyForge.Domain.Enums;
+using StrategyForge.Domain.Interfaces.Providers;
+using StrategyForge.Domain.Models;
+using StrategyForge.Infrastructure.Services;
+
+namespace StrategyForge.Infrastructure.DataAdapters;
+
+/// <summary>
+/// Base class for all data source adapters.
+/// Provides common HTTP handling, rate limiting, retry logic, caching,
+/// and response normalization.
+/// </summary>
+public abstract class BaseDataSourceAdapter : IDataSourceAdapter
+{
+    protected readonly HttpClient HttpClient;
+    protected readonly ILogger Logger;
+    protected readonly RateLimiter RateLimiter;
+    protected readonly InMemoryDataCache Cache;
+    protected readonly DataQualityValidator QualityValidator;
+    protected readonly SourceAdapterConfig Config;
+    protected readonly DataSourceSettings GlobalSettings;
+
+    private readonly AdapterHealthStatus _health = new() { IsHealthy = true };
+
+    public abstract SourceAdapterType SourceType { get; }
+    public string Name { get; init; }
+    public abstract IReadOnlyList<string> Domains { get; }
+    public bool IsEnabled => Config.Enabled;
+
+    protected BaseDataSourceAdapter(
+        HttpClient httpClient,
+        IOptions<DataSourceSettings> settings,
+        ILogger logger,
+        RateLimiter rateLimiter,
+        InMemoryDataCache cache,
+        DataQualityValidator qualityValidator,
+        string configKey)
+    {
+        HttpClient = httpClient;
+        Logger = logger;
+        RateLimiter = rateLimiter;
+        Cache = cache;
+        QualityValidator = qualityValidator;
+        GlobalSettings = settings.Value;
+
+        if (!settings.Value.Sources.TryGetValue(configKey, out var sourceConfig))
+        {
+            throw new ArgumentException($"No configuration found for source '{configKey}'");
+        }
+        Config = sourceConfig;
+        Name = Config.Name;
+
+        // Configure HttpClient
+        HttpClient.BaseAddress = new Uri(Config.BaseUrl);
+        HttpClient.Timeout = TimeSpan.FromSeconds(Config.TimeoutSeconds ?? GlobalSettings.HttpTimeoutSeconds);
+        if (!HttpClient.DefaultRequestHeaders.Contains("User-Agent"))
+        {
+            HttpClient.DefaultRequestHeaders.Add("User-Agent", GlobalSettings.UserAgent);
+        }
+    }
+
+    /// <summary>Get the domain for rate limiting from the BaseAddress.</summary>
+    protected string GetDomain() => HttpClient.BaseAddress!.Host;
+
+    // --- Abstract methods for subclasses ---
+
+    protected abstract Task<IReadOnlyList<Candle>> FetchCandlesFromSourceAsync(
+        string sourceInstrumentId,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken);
+
+    protected abstract Task<Candle?> FetchLatestCandleFromSourceAsync(
+        string sourceInstrumentId,
+        CancellationToken cancellationToken);
+
+    protected abstract bool CanSupportInstrument(InstrumentMapping instrument);
+
+    // --- IDataSourceAdapter implementation ---
+
+    public virtual Task<DataResult<IReadOnlyList<Candle>>> GetHistoricalCandlesAsync(
+        InstrumentMapping instrument,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken = default)
+    {
+        return ExecuteWithResilienceAsync(
+            instrument,
+            "daily_ohlc",
+            async () =>
+            {
+                var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
+                if (sourceId == null)
+                {
+                    return DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2
+                    {
+                        Code = "INSTRUMENT_NOT_FOUND",
+                        Message = $"No {Name} identifier found for instrument {instrument.Symbol}",
+                        Retryable = false
+                    });
+                }
+
+                // Check cache
+                var cacheKey = InMemoryDataCache.MarketDataKey(instrument.InstrumentId, SourceType.ToString(), from, to);
+                if (Cache.TryGet<IReadOnlyList<Candle>>(cacheKey, out var cached) && cached != null)
+                {
+                    Logger.LogDebug("Cache hit for {Source} candles: {Symbol}", SourceType, instrument.Symbol);
+                    return CreateCandleResult(cached, instrument, from, to, isCached: true);
+                }
+
+                // Rate limit
+                await RateLimiter.WaitForSlotAsync(GetDomain(), Config.RateLimitPerSecond, cancellationToken);
+
+                // Fetch from source
+                var sw = Stopwatch.StartNew();
+                var candles = await FetchCandlesFromSourceAsync(sourceId.Id, from, to, cancellationToken);
+                sw.Stop();
+
+                // Cache result
+                Cache.Set(cacheKey, candles, TimeSpan.FromMinutes(Config.CacheMinutes));
+
+                Logger.LogInformation(
+                    "Fetched {Count} candles from {Source} for {Symbol} in {Elapsed}ms",
+                    candles.Count, Name, instrument.Symbol, sw.ElapsedMilliseconds);
+
+                return CreateCandleResult(candles, instrument, from, to, isCached: false, elapsed: sw.Elapsed);
+            },
+            cancellationToken);
+    }
+
+    public virtual Task<DataResult<Candle>> GetLatestCandleAsync(
+        InstrumentMapping instrument,
+        CancellationToken cancellationToken = default)
+    {
+        return ExecuteWithResilienceAsync(
+            instrument,
+            "latest_candle",
+            async () =>
+            {
+                var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
+                if (sourceId == null)
+                {
+                    return DataResult<Candle>.Failure(new DataCollectionError2
+                    {
+                        Code = "INSTRUMENT_NOT_FOUND",
+                        Message = $"No {Name} identifier found for instrument {instrument.Symbol}",
+                        Retryable = false
+                    });
+                }
+
+                // Check cache
+                var cacheKey = InMemoryDataCache.LatestCandleKey(instrument.InstrumentId, SourceType.ToString());
+                if (Cache.TryGet<Candle>(cacheKey, out var cached) && cached != null)
+                {
+                    return CreateLatestResult(cached, instrument, isCached: true);
+                }
+
+                // Rate limit
+                await RateLimiter.WaitForSlotAsync(GetDomain(), Config.RateLimitPerSecond, cancellationToken);
+
+                // Fetch from source
+                var sw = Stopwatch.StartNew();
+                var candle = await FetchLatestCandleFromSourceAsync(sourceId.Id, cancellationToken);
+                sw.Stop();
+
+                if (candle == null)
+                {
+                    return DataResult<Candle>.Failure(new DataCollectionError2
+                    {
+                        Code = "DATA_VALIDATION_FAILED",
+                        Message = $"No data returned from {Name} for {instrument.Symbol}",
+                        Retryable = true,
+                        SourceHttpStatus = 200
+                    });
+                }
+
+                // Cache for a shorter time for latest data
+                Cache.Set(cacheKey, candle, TimeSpan.FromMinutes(Math.Min(Config.CacheMinutes, 5)));
+
+                return CreateLatestResult(candle, instrument, isCached: false, elapsed: sw.Elapsed);
+            },
+            cancellationToken);
+    }
+
+    public virtual bool Supports(InstrumentMapping instrument) =>
+        IsEnabled && instrument.SourceIdentifiers.ContainsKey(SourceType) && CanSupportInstrument(instrument);
+
+    public virtual Task<AdapterHealthStatus> GetHealthAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_health);
+    }
+
+    // --- Resilience and helpers ---
+
+    protected async Task<DataResult<T>> ExecuteWithResilienceAsync<T>(
+        InstrumentMapping instrument,
+        string dataType,
+        Func<Task<DataResult<T>>> action,
+        CancellationToken cancellationToken)
+    {
+        var maxRetries = Config.MaxRetries;
+        DataResult<T>? lastResult = null;
+        var sw = Stopwatch.StartNew();
+
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                lastResult = await action();
+                if (lastResult.Ok)
+                {
+                    _health.LastSuccessfulRequest = DateTimeOffset.UtcNow;
+                    _health.ConsecutiveFailures = 0;
+                    return lastResult;
+                }
+
+                // If the error is not retryable, return immediately
+                if (lastResult.Error != null && !lastResult.Error.Retryable)
+                    break;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex,
+                    "Attempt {Attempt}/{MaxRetries} failed for {Source} {DataType} on {Symbol}",
+                    attempt + 1, maxRetries, Name, dataType, instrument.Symbol);
+
+                _health.ConsecutiveFailures++;
+                _health.LastError = ex.Message;
+
+                lastResult = DataResult<T>.Failure(new DataCollectionError2
+                {
+                    Code = "SOURCE_UNAVAILABLE",
+                    Message = $"Request failed after {attempt + 1} attempts: {ex.Message}",
+                    Retryable = true
+                });
+            }
+
+            if (attempt < maxRetries)
+            {
+                var delay = CalculateBackoff(attempt);
+                Logger.LogDebug("Retrying in {Delay}ms (attempt {Attempt}/{MaxRetries})",
+                    delay, attempt + 2, maxRetries);
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+
+        sw.Stop();
+        _health.ConsecutiveFailures++;
+
+        return lastResult ?? DataResult<T>.Failure(new DataCollectionError2
+        {
+            Code = "INTERNAL_ERROR",
+            Message = "Unexpected null result from retry loop",
+            Retryable = false
+        });
+    }
+
+    protected int CalculateBackoff(int attempt)
+    {
+        var baseDelay = GlobalSettings.RetryBaseDelayMs;
+        var maxDelay = GlobalSettings.RetryMaxDelayMs;
+        var delay = baseDelay * (int)Math.Pow(2, attempt);
+
+        // Add bounded jitter (±25%)
+        var jitter = Random.Shared.Next(-(delay / 4), delay / 4 + 1);
+        return Math.Min(delay + jitter, maxDelay);
+    }
+
+    protected static async Task<JsonDocument> ParseJsonResponseAsync(HttpResponseMessage response)
+    {
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        return JsonDocument.Parse(content);
+    }
+
+    private DataResult<IReadOnlyList<Candle>> CreateCandleResult(
+        IReadOnlyList<Candle> candles,
+        InstrumentMapping instrument,
+        DateOnly from,
+        DateOnly to,
+        bool isCached,
+        TimeSpan? elapsed = null)
+    {
+        var freshness = isCached
+            ? DataFreshness.Cached(DateTimeOffset.UtcNow.AddMinutes(-Config.CacheMinutes))
+            : DataFreshness.Fresh(TimeSpan.FromMinutes(Config.CacheMinutes));
+
+        var quality = QualityValidator.ValidateCandles(candles, freshness);
+
+        var summary = new DataSummary
+        {
+            Count = candles.Count,
+            StartDate = candles.Count > 0 ? candles[0].Date : null,
+            EndDate = candles.Count > 0 ? candles[^1].Date : null,
+            QuoteCurrency = instrument.QuoteCurrency,
+            Description = $"Historical OHLC evidence from {Name}"
+        };
+
+        return DataResult<IReadOnlyList<Candle>>.Success(
+            candles,
+            summary: summary,
+            freshness: freshness,
+            quality: quality,
+            metadata: new AcquisitionMetadata
+            {
+                Elapsed = elapsed ?? TimeSpan.Zero,
+                CacheHit = isCached,
+                Sources = [Name]
+            });
+    }
+
+    private DataResult<Candle> CreateLatestResult(
+        Candle candle,
+        InstrumentMapping instrument,
+        bool isCached,
+        TimeSpan? elapsed = null)
+    {
+        var freshness = isCached
+            ? DataFreshness.Cached(DateTimeOffset.UtcNow.AddMinutes(-Config.CacheMinutes))
+            : DataFreshness.Fresh(TimeSpan.FromMinutes(Config.CacheMinutes));
+
+        var quality = QualityValidator.ValidateCandle(candle);
+
+        return DataResult<Candle>.Success(
+            candle,
+            freshness: freshness,
+            quality: quality,
+            metadata: new AcquisitionMetadata
+            {
+                Elapsed = elapsed ?? TimeSpan.Zero,
+                CacheHit = isCached,
+                Sources = [Name]
+            });
+    }
+
+    protected DataCollectionError2 CreateError(string code, string message, bool retryable, int? httpStatus = null) => new()
+    {
+        Code = code,
+        Message = message,
+        Retryable = retryable,
+        SourceHttpStatus = httpStatus,
+        OccurredAtUtc = DateTimeOffset.UtcNow
+    };
+}

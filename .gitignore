@@ -1,0 +1,142 @@
+# =========================
+# .NET / C# .gitignore
+# =========================
+
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Publish output
+publish/
+*.publish.xml
+*.azurePubxml
+*.pubxml
+*.publishproj
+
+# ClickOnce
+*.appxmanifest
+*.appx
+*.appxbundle
+*.appxupload
+
+# Misc
+*.swp
+*~
+~$*
+*.bak
+*.tmp
+*.orig
+
+# User-specific
+appsettings.*.local.json
+*.local.env
+*.local.yaml
+
+# Docker
+docker-compose.override.yml
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+TestResult.xml
+coverage*/
+*.cover
+*.coveragexml
+
+# SQL
+*.mdf
+*.ldf
+*.ndf
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# dotnet tool
+.config/dotnet-tools.json
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# .NET build artifacts
+bin/
+obj/
+*/bin/
+*/obj/
+**/bin/
+**/obj/
+*.csproj.user
+*.sln.DotSettings.user
+.vs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+.Spotlight-V100
+.Trashes
+ehthumbs.db
