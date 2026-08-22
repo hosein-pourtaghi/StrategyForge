@@ -24,6 +24,12 @@ public enum SourceAdapterType
     /// <summary>Servat Mandi — futures data.</summary>
     ServatMandi,
 
+    /// <summary>TSE Web Gateway — TSETMC instrument info and order book.</summary>
+    TseWebGateway,
+
+    /// <summary>BRSAPI — third-party TSETMC data wrapper with API key auth.</summary>
+    BrsApi,
+
     /// <summary>Nobitex — USDT/IRR crypto exchange.</summary>
     Nobitex,
 

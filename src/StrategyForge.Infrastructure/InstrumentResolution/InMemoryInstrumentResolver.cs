@@ -147,7 +147,9 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tsetmc] = new() { Id = "4439113430858354", SourceSymbol = "فولاد", LastVerified = now }
+                [SourceAdapterType.Tsetmc] = new() { Id = "4439113430858354", SourceSymbol = "فولاد", LastVerified = now },
+                [SourceAdapterType.BrsApi] = new() { Id = "4439113430858354", SourceSymbol = "فولاد", LastVerified = now },
+                [SourceAdapterType.TseWebGateway] = new() { Id = "4439113430858354", SourceSymbol = "فولاد", LastVerified = now }
             }
         });
 
@@ -162,7 +164,9 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tsetmc] = new() { Id = "65915385444382438", SourceSymbol = "فملی", LastVerified = now }
+                [SourceAdapterType.Tsetmc] = new() { Id = "65915385444382438", SourceSymbol = "فملی", LastVerified = now },
+                [SourceAdapterType.BrsApi] = new() { Id = "65915385444382438", SourceSymbol = "فملی", LastVerified = now },
+                [SourceAdapterType.TseWebGateway] = new() { Id = "65915385444382438", SourceSymbol = "فملی", LastVerified = now }
             }
         });
 
@@ -177,7 +181,9 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tsetmc] = new() { Id = "36178638763352870", SourceSymbol = "شپدیس", LastVerified = now }
+                [SourceAdapterType.Tsetmc] = new() { Id = "36178638763352870", SourceSymbol = "شپدیس", LastVerified = now },
+                [SourceAdapterType.BrsApi] = new() { Id = "36178638763352870", SourceSymbol = "شپدیس", LastVerified = now },
+                [SourceAdapterType.TseWebGateway] = new() { Id = "36178638763352870", SourceSymbol = "شپدیس", LastVerified = now }
             }
         });
 
@@ -192,7 +198,9 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tsetmc] = new() { Id = "10523225570658595", SourceSymbol = "فارس", LastVerified = now }
+                [SourceAdapterType.Tsetmc] = new() { Id = "10523225570658595", SourceSymbol = "فارس", LastVerified = now },
+                [SourceAdapterType.BrsApi] = new() { Id = "10523225570658595", SourceSymbol = "فارس", LastVerified = now },
+                [SourceAdapterType.TseWebGateway] = new() { Id = "10523225570658595", SourceSymbol = "فارس", LastVerified = now }
             }
         });
 
@@ -207,7 +215,9 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tsetmc] = new() { Id = "62772852867228498", SourceSymbol = "خودرو", LastVerified = now }
+                [SourceAdapterType.Tsetmc] = new() { Id = "62772852867228498", SourceSymbol = "خودرو", LastVerified = now },
+                [SourceAdapterType.BrsApi] = new() { Id = "62772852867228498", SourceSymbol = "خودرو", LastVerified = now },
+                [SourceAdapterType.TseWebGateway] = new() { Id = "62772852867228498", SourceSymbol = "خودرو", LastVerified = now }
             }
         });
 
@@ -297,7 +307,8 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tgju] = new() { Id = "price_tether", SourceSymbol = "price_tether", LastVerified = now }
+                [SourceAdapterType.Tgju] = new() { Id = "price_tether", SourceSymbol = "price_tether", LastVerified = now },
+                [SourceAdapterType.Nobitex] = new() { Id = "USDTIRT", SourceSymbol = "USDTIRT", LastVerified = now }
             }
         });
 

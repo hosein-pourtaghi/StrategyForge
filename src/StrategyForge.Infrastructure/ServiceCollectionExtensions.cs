@@ -38,6 +38,9 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("tsetmc");
         services.AddHttpClient("tgju");
         services.AddHttpClient("cbi");
+        services.AddHttpClient("tsewebgateway");
+        services.AddHttpClient("brsapi");
+        services.AddHttpClient("nobitex");
 
         // --- Source Adapters ---
         services.AddTransient<TsetmcAdapter>(sp =>
@@ -83,9 +86,54 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IDataSourceAuthenticator>());
         });
 
+        services.AddTransient<TseWebGatewayAdapter>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var client = factory.CreateClient("tsewebgateway");
+            return new TseWebGatewayAdapter(
+                client,
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataSourceSettings>>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<TseWebGatewayAdapter>>(),
+                sp.GetRequiredService<RateLimiter>(),
+                sp.GetRequiredService<InMemoryDataCache>(),
+                sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>());
+        });
+
+        services.AddTransient<BrsApiAdapter>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var client = factory.CreateClient("brsapi");
+            return new BrsApiAdapter(
+                client,
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataSourceSettings>>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<BrsApiAdapter>>(),
+                sp.GetRequiredService<RateLimiter>(),
+                sp.GetRequiredService<InMemoryDataCache>(),
+                sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>());
+        });
+
+        services.AddTransient<NobitexAdapter>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var client = factory.CreateClient("nobitex");
+            return new NobitexAdapter(
+                client,
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataSourceSettings>>(),
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<NobitexAdapter>>(),
+                sp.GetRequiredService<RateLimiter>(),
+                sp.GetRequiredService<InMemoryDataCache>(),
+                sp.GetRequiredService<DataQualityValidator>(),
+                sp.GetRequiredService<IDataSourceAuthenticator>());
+        });
+
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<TsetmcAdapter>());
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<TgjuAdapter>());
         services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<CbiAdapter>());
+        services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<TseWebGatewayAdapter>());
+        services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<BrsApiAdapter>());
+        services.AddTransient<IDataSourceAdapter>(sp => sp.GetRequiredService<NobitexAdapter>());
 
         // --- Registry ---
         services.AddSingleton<IDataSourceRegistry, DataSourceRegistry>();

@@ -82,6 +82,40 @@ public sealed record DataSourceSettings
                 CacheMinutes = 60,
                 MaxRetries = 2,
                 Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
+            },
+            ["tsewebgateway"] = new SourceAdapterConfig
+            {
+                Name = "TSEWebGateway",
+                SourceType = SourceAdapterType.TseWebGateway,
+                Enabled = true,
+                BaseUrl = "https://cdn.tsetmc.com",
+                CacheMinutes = 15,
+                MaxRetries = 3,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
+            },
+            ["brsapi"] = new SourceAdapterConfig
+            {
+                Name = "BRSAPI",
+                SourceType = SourceAdapterType.BrsApi,
+                Enabled = true,
+                BaseUrl = "https://Api.BrsApi.ir",
+                CacheMinutes = 5,
+                MaxRetries = 2,
+                Authentication = new AuthenticationSettings
+                {
+                    Mode = AuthenticationMode.ApiKey,
+                    CredentialReference = "StrategyForge:BrsApi:ApiKey"
+                }
+            },
+            ["nobitex"] = new SourceAdapterConfig
+            {
+                Name = "Nobitex",
+                SourceType = SourceAdapterType.Nobitex,
+                Enabled = true,
+                BaseUrl = "https://apiv2.nobitex.ir",
+                CacheMinutes = 5,
+                MaxRetries = 3,
+                Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }
             }
         };
 }
