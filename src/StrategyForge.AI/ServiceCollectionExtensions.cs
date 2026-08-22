@@ -1,32 +1,29 @@
 using Microsoft.Extensions.DependencyInjection;
+using StrategyForge.AI.Providers;
+using StrategyForge.AI.Services;
 using StrategyForge.Domain.Interfaces.AI;
 
 namespace StrategyForge.AI;
 
 /// <summary>
 /// DI registration extension for the AI layer.
-/// Registers agents and LLM provider.
+/// Registers the LLM provider, context builder, prompt builder, and interpretation service.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers StrategyForge AI services (agents, LLM provider).
+    /// Registers StrategyForge AI services (LLM provider, interpretation pipeline).
     /// </summary>
     public static IServiceCollection AddStrategyForgeAI(this IServiceCollection services)
     {
-        // Register the LLM provider
-        // To switch providers: change the registration here or via configuration.
-        // services.AddSingleton<ILLMProvider, OpenAiCompatibleLlmProvider>();
+        // Register the LLM provider as a typed HttpClient
+        services.AddHttpClient<ILLMProvider, OpenAiCompatibleLlmProvider>();
 
-        // Register specialist agents
-        // Each agent is registered as IAgent so the orchestrator can discover them.
-        // To add a new agent: implement IAgent + add a registration line here.
-        // services.AddSingleton<IAgent, TechnicalAnalystAgent>();
-        // services.AddSingleton<IAgent, FundamentalAnalystAgent>();
-        // services.AddSingleton<IAgent, MacroAnalystAgent>();
-        // services.AddSingleton<IAgent, NewsAnalystAgent>();
-        // services.AddSingleton<IAgent, PoliticalRiskAnalystAgent>();
-        // services.AddSingleton<IAgent, RiskAnalystAgent>();
+        // Register AI services
+        services.AddSingleton<AnalysisContextBuilder>();
+        services.AddSingleton<PromptBuilder>();
+        services.AddSingleton<LlmResponseValidator>();
+        services.AddSingleton<LlmInterpretationService>();
 
         return services;
     }

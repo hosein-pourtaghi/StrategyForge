@@ -20,12 +20,11 @@ public static class ServiceCollectionExtensions
         // Register individual indicators
         // Each indicator is registered as IIndicator so the engine can discover them.
         // To add a new indicator: implement IIndicator + add a registration line here.
-        // services.AddSingleton<IIndicator, RsiIndicator>();
-        // services.AddSingleton<IIndicator, MacdIndicator>();
-        // services.AddSingleton<IIndicator, SmIndicator>();
-        // services.AddSingleton<IIndicator, EmaIndicator>();
-        // services.AddSingleton<IIndicator, BollingerBandsIndicator>();
-        // services.AddSingleton<IIndicator, AtrIndicator>();
+        services.AddSingleton<IIndicator, Indicators.SmIndicator>();
+        services.AddSingleton<IIndicator, Indicators.EmaIndicator>();
+        services.AddSingleton<IIndicator, Indicators.RsiIndicator>();
+        services.AddSingleton<IIndicator, Indicators.MacdIndicator>();
+        services.AddSingleton<IIndicator, Indicators.BollingerBandsIndicator>();
 
         return services;
     }
