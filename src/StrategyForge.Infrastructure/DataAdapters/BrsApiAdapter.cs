@@ -29,6 +29,7 @@ public sealed class BrsApiAdapter : BaseDataSourceAdapter
 {
     public override SourceAdapterType SourceType => SourceAdapterType.BrsApi;
     public override IReadOnlyList<string> Domains { get; } = ["Api.BrsApi.ir"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.Snapshot];
 
     public BrsApiAdapter(
         HttpClient httpClient,

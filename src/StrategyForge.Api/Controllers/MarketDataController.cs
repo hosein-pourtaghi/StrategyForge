@@ -67,7 +67,7 @@ public class MarketDataController : ControllerBase
             });
         }
 
-        var result = await _service.GetCandlesAsync(instrument.Trim(), fromDate, toDate, source, ct);
+        var result = await _service.GetCandlesAsync(instrument.Trim(), fromDate, toDate, source, SourceSelectionMode.BestAvailable, ct);
 
         if (!result.Ok && result.Error?.Code == "INSTRUMENT_NOT_FOUND")
         {
@@ -108,7 +108,49 @@ public class MarketDataController : ControllerBase
             });
         }
 
-        var result = await _service.GetSnapshotAsync(instrument.Trim(), source, ct);
+        var result = await _service.GetSnapshotAsync(instrument.Trim(), source, SourceSelectionMode.BestAvailable, ct);
+
+        if (!result.Ok && result.Error?.Code == "INSTRUMENT_NOT_FOUND")
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Instrument Not Found",
+                Detail = result.Error.Message,
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
+        return Ok(result);
+    }
+
+
+    /// <summary>
+    /// Get order book (depth-of-market) data for an instrument.
+    /// </summary>
+    /// <param name="instrument">Instrument query (Persian symbol, Latin symbol, numeric ID, or canonical ID).</param>
+    /// <param name="source">Preferred data source adapter type (optional).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Order book with bid/ask levels, provenance, and quality metadata.</returns>
+    [HttpGet("order-book")]
+    [ProducesResponseType(typeof(DataResultResponse<OrderBookResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOrderBook(
+        [FromQuery] string? instrument,
+        [FromQuery] SourceAdapterType? source,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(instrument))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid Request",
+                Detail = "Instrument parameter is required.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var result = await _service.GetOrderBookAsync(instrument.Trim(), source, SourceSelectionMode.BestAvailable, ct);
 
         if (!result.Ok && result.Error?.Code == "INSTRUMENT_NOT_FOUND")
         {

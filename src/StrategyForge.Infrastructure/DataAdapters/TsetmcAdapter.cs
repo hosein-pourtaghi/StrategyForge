@@ -24,6 +24,7 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
 
     public override SourceAdapterType SourceType => SourceAdapterType.Tsetmc;
     public override IReadOnlyList<string> Domains { get; } = ["cdn.tsetmc.com"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.HistoricalCandles, MarketDataType.Snapshot];
 
     public TsetmcAdapter(
         HttpClient httpClient,

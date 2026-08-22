@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using StrategyForge.Api.Contracts;
 using StrategyForge.Api.Controllers;
@@ -20,7 +21,9 @@ public class MarketDataControllerTests
     {
         _resolverMock = new Mock<IInstrumentResolver>();
         _registryMock = new Mock<IDataSourceRegistry>();
-        var service = new MarketDataService(_resolverMock.Object, _registryMock.Object);
+        var pipelineLogger = new Mock<ILogger<EvidenceQueryPipeline>>();
+        var pipeline = new EvidenceQueryPipeline(_registryMock.Object, _resolverMock.Object, pipelineLogger.Object);
+        var service = new MarketDataService(pipeline);
         _controller = new MarketDataController(service);
     }
 
@@ -28,7 +31,6 @@ public class MarketDataControllerTests
     public async Task GetCandles_NullInstrument_ReturnsBadRequest()
     {
         var result = await _controller.GetCandles(null, null, null, null, CancellationToken.None);
-
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
@@ -36,7 +38,6 @@ public class MarketDataControllerTests
     public async Task GetCandles_EmptyInstrument_ReturnsBadRequest()
     {
         var result = await _controller.GetCandles("", null, null, null, CancellationToken.None);
-
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
@@ -49,7 +50,6 @@ public class MarketDataControllerTests
             new DateOnly(2025, 1, 1),
             null,
             CancellationToken.None);
-
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
@@ -60,7 +60,6 @@ public class MarketDataControllerTests
             .ReturnsAsync((InstrumentMapping?)null);
 
         var result = await _controller.GetCandles("unknown", null, null, null, CancellationToken.None);
-
         Assert.IsType<NotFoundObjectResult>(result);
     }
 
@@ -75,6 +74,7 @@ public class MarketDataControllerTests
                 It.IsAny<DateOnly>(),
                 It.IsAny<DateOnly>(),
                 It.IsAny<SourceAdapterType?>(),
+                It.IsAny<SourceSelectionMode>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Success(
                 new List<Candle>
@@ -83,7 +83,6 @@ public class MarketDataControllerTests
                 }.AsReadOnly()));
 
         var result = await _controller.GetCandles("فولاد", new DateOnly(2024, 1, 1), new DateOnly(2024, 1, 31), null, CancellationToken.None);
-
         Assert.IsType<OkObjectResult>(result);
     }
 
@@ -91,7 +90,6 @@ public class MarketDataControllerTests
     public async Task GetSnapshot_NullInstrument_ReturnsBadRequest()
     {
         var result = await _controller.GetSnapshot(null, null, CancellationToken.None);
-
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
@@ -102,7 +100,23 @@ public class MarketDataControllerTests
             .ReturnsAsync((InstrumentMapping?)null);
 
         var result = await _controller.GetSnapshot("unknown", null, CancellationToken.None);
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
 
+    [Fact]
+    public async Task GetOrderBook_NullInstrument_ReturnsBadRequest()
+    {
+        var result = await _controller.GetOrderBook(null, null, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetOrderBook_InstrumentNotFound_ReturnsNotFound()
+    {
+        _resolverMock.Setup(r => r.ResolveAsync("unknown", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((InstrumentMapping?)null);
+
+        var result = await _controller.GetOrderBook("unknown", null, CancellationToken.None);
         Assert.IsType<NotFoundObjectResult>(result);
     }
 

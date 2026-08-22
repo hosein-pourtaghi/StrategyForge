@@ -31,6 +31,7 @@ public sealed class NobitexAdapter : BaseDataSourceAdapter
 {
     public override SourceAdapterType SourceType => SourceAdapterType.Nobitex;
     public override IReadOnlyList<string> Domains { get; } = ["apiv2.nobitex.ir"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.HistoricalCandles, MarketDataType.Snapshot, MarketDataType.MarketStatistics];
 
     /// <summary>Map from StrategyForge symbol to Nobitex symbol format.</summary>
     private static readonly Dictionary<string, string> NobitexSymbols = new(StringComparer.OrdinalIgnoreCase)

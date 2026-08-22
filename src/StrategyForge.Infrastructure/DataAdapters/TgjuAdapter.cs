@@ -24,6 +24,7 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
 {
     public override SourceAdapterType SourceType => SourceAdapterType.Tgju;
     public override IReadOnlyList<string> Domains { get; } = ["tgju.org"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.HistoricalCandles, MarketDataType.Snapshot, MarketDataType.FreeMarketFxRate, MarketDataType.MarketStatistics];
 
     private static readonly Dictionary<string, string> TgjuSymbols = new(StringComparer.OrdinalIgnoreCase)
     {

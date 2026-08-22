@@ -1,23 +1,22 @@
+using Microsoft.AspNetCore.Mvc;
 using StrategyForge.Api.Contracts;
 using StrategyForge.Domain.Enums;
-using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
 
 namespace StrategyForge.Api.Services;
 
 /// <summary>
 /// Application service for market data acquisition.
-/// Resolves instruments, selects sources, and delegates to the registry.
+/// Delegates to EvidenceQueryPipeline for resolution and source selection,
+/// then maps canonical results to API response contracts.
 /// </summary>
 public sealed class MarketDataService
 {
-    private readonly IInstrumentResolver _resolver;
-    private readonly IDataSourceRegistry _registry;
+    private readonly EvidenceQueryPipeline _pipeline;
 
-    public MarketDataService(IInstrumentResolver resolver, IDataSourceRegistry registry)
+    public MarketDataService(EvidenceQueryPipeline pipeline)
     {
-        _resolver = resolver;
-        _registry = registry;
+        _pipeline = pipeline;
     }
 
     public async Task<DataResultResponse<IReadOnlyList<CandleResponse>>> GetCandlesAsync(
@@ -25,39 +24,34 @@ public sealed class MarketDataService
         DateOnly from,
         DateOnly to,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken ct = default)
     {
-        var instrument = await _resolver.ResolveAsync(instrumentQuery, ct);
-        if (instrument == null)
-        {
-            return new DataResultResponse<IReadOnlyList<CandleResponse>>
-            {
-                Ok = false,
-                Error = new ErrorDetailResponse { Code = "INSTRUMENT_NOT_FOUND", Message = $"No instrument found for '{instrumentQuery}'", Retryable = false }
-            };
-        }
-
-        var result = await _registry.FetchHistoricalCandlesAsync(instrument, from, to, preferredSource, ct);
+        var result = await _pipeline.GetHistoricalCandlesAsync(
+            instrumentQuery, from, to, preferredSource, selectionMode, ct);
         return MapCandlesResult(result);
     }
 
     public async Task<DataResultResponse<CandleResponse>> GetSnapshotAsync(
         string instrumentQuery,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken ct = default)
     {
-        var instrument = await _resolver.ResolveAsync(instrumentQuery, ct);
-        if (instrument == null)
-        {
-            return new DataResultResponse<CandleResponse>
-            {
-                Ok = false,
-                Error = new ErrorDetailResponse { Code = "INSTRUMENT_NOT_FOUND", Message = $"No instrument found for '{instrumentQuery}'", Retryable = false }
-            };
-        }
-
-        var result = await _registry.FetchLatestCandleAsync(instrument, preferredSource, ct);
+        var result = await _pipeline.GetSnapshotAsync(
+            instrumentQuery, preferredSource, selectionMode, ct);
         return MapSingleCandleResult(result);
+    }
+
+    public async Task<DataResultResponse<OrderBookResponse>> GetOrderBookAsync(
+        string instrumentQuery,
+        SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CancellationToken ct = default)
+    {
+        var result = await _pipeline.GetOrderBookAsync(
+            instrumentQuery, preferredSource, selectionMode, ct);
+        return MapOrderBookResult(result);
     }
 
     private static DataResultResponse<IReadOnlyList<CandleResponse>> MapCandlesResult(
@@ -138,5 +132,63 @@ public sealed class MarketDataService
             IsCached = c.Provenance.IsCached,
             Endpoint = c.Provenance.Endpoint
         } : null
+    };
+
+    private static DataResultResponse<OrderBookResponse> MapOrderBookResult(
+        DataResult<OrderBook> result) => new()
+    {
+        Ok = result.Ok,
+        Data = result.Data != null ? new OrderBookResponse
+        {
+            InstrumentId = result.Data.InstrumentId,
+            Timestamp = result.Data.Timestamp,
+            Bids = result.Data.Bids.Select(b => new OrderBookLevelResponse
+            {
+                Price = b.Price,
+                Quantity = b.Quantity,
+                OrderCount = b.OrderCount
+            }).ToList().AsReadOnly(),
+            Asks = result.Data.Asks.Select(a => new OrderBookLevelResponse
+            {
+                Price = a.Price,
+                Quantity = a.Quantity,
+                OrderCount = a.OrderCount
+            }).ToList().AsReadOnly(),
+            BestBid = result.Data.BestBid,
+            BestAsk = result.Data.BestAsk,
+            MidPrice = result.Data.MidPrice,
+            Spread = result.Data.Spread,
+            Provenance = result.Data.Provenance != null ? new ProvenanceResponse
+            {
+                Source = result.Data.Provenance.Source.ToString(),
+                SourceSymbol = result.Data.Provenance.SourceSymbol,
+                SourceInstrumentId = result.Data.Provenance.SourceInstrumentId,
+                FetchedAtUtc = result.Data.Provenance.FetchedAtUtc,
+                IsCached = result.Data.Provenance.IsCached,
+                Endpoint = result.Data.Provenance.Endpoint
+            } : null
+        } : null,
+        Summary = null,
+        Freshness = result.Freshness != null ? new FreshnessResponse
+        {
+            FetchedAtUtc = result.Freshness.FetchedAtUtc,
+            AgeMs = result.Freshness.AgeMs,
+            MaxAllowedAgeMs = result.Freshness.MaxAllowedAgeMs,
+            IsFresh = result.Freshness.IsFresh,
+            IsCached = result.Freshness.IsCached
+        } : null,
+        Quality = result.Quality != null ? new QualityResponse
+        {
+            Score = result.Quality.Score,
+            IsComplete = result.Quality.IsComplete,
+            Flags = result.Quality.FlagDescriptions.Count > 0 ? string.Join(", ", result.Quality.FlagDescriptions) : null
+        } : null,
+        Error = result.Error != null ? new ErrorDetailResponse
+        {
+            Code = result.Error.Code,
+            Message = result.Error.Message,
+            Retryable = result.Error.Retryable
+        } : null,
+        Warnings = result.Warnings?.Select(w => new WarningResponse { Code = w.Code, Message = w.Message }).ToList().AsReadOnly() ?? []
     };
 }

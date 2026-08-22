@@ -5,11 +5,7 @@ namespace StrategyForge.Domain.Interfaces.Providers;
 
 /// <summary>
 /// Manages the collection of registered source adapters.
-/// Handles adapter selection, fallback logic, and health monitoring.
-/// 
-/// The registry is the central coordination point for the Data Acquisition Layer.
-/// It decides which adapter to use for a given request and handles fallback
-/// when the primary adapter fails.
+/// Handles capability-aware adapter selection, fallback logic, and health monitoring.
 /// </summary>
 public interface IDataSourceRegistry
 {
@@ -24,6 +20,14 @@ public interface IDataSourceRegistry
     IReadOnlyList<IDataSourceAdapter> GetAdaptersForInstrument(InstrumentMapping instrument);
 
     /// <summary>
+    /// Gets adapters that support both the given instrument AND the requested data type.
+    /// Source selection is deterministic: healthy adapters first, then by source type order.
+    /// </summary>
+    IReadOnlyList<IDataSourceAdapter> GetAdaptersForCapability(
+        InstrumentMapping instrument,
+        MarketDataType dataType);
+
+    /// <summary>
     /// Gets the best available adapter for the given instrument, considering health and priority.
     /// </summary>
     IDataSourceAdapter? GetBestAdapter(InstrumentMapping instrument);
@@ -35,13 +39,13 @@ public interface IDataSourceRegistry
 
     /// <summary>
     /// Fetches historical candles with automatic source selection and fallback.
-    /// Tries the primary source first; if it fails, tries compatible alternatives.
     /// </summary>
     Task<DataResult<IReadOnlyList<Candle>>> FetchHistoricalCandlesAsync(
         InstrumentMapping instrument,
         DateOnly from,
         DateOnly to,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -50,6 +54,17 @@ public interface IDataSourceRegistry
     Task<DataResult<Candle>> FetchLatestCandleAsync(
         InstrumentMapping instrument,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches order book data with automatic source selection and fallback.
+    /// Only adapters that support OrderBook capability will be tried.
+    /// </summary>
+    Task<DataResult<OrderBook>> FetchOrderBookAsync(
+        InstrumentMapping instrument,
+        SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken cancellationToken = default);
 
     /// <summary>

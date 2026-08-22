@@ -22,6 +22,9 @@ public interface IDataSourceAdapter
     /// <summary>The domain(s) this adapter fetches data from.</summary>
     IReadOnlyList<string> Domains { get; }
 
+    /// <summary>The market data types this adapter can provide.</summary>
+    IReadOnlyList<MarketDataType> SupportedCapabilities { get; }
+
     /// <summary>Whether this adapter is currently enabled.</summary>
     bool IsEnabled { get; }
 
@@ -38,6 +41,14 @@ public interface IDataSourceAdapter
     /// Fetches the most recent candle/snapshot for an instrument.
     /// </summary>
     Task<DataResult<Candle>> GetLatestCandleAsync(
+        InstrumentMapping instrument,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches order book (depth-of-market) data for an instrument.
+    /// Returns UNSUPPORTED_CAPABILITY if this adapter does not provide order books.
+    /// </summary>
+    Task<DataResult<OrderBook>> GetOrderBookAsync(
         InstrumentMapping instrument,
         CancellationToken cancellationToken = default);
 

@@ -22,6 +22,7 @@ public sealed class CbiAdapter : BaseDataSourceAdapter
 {
     public override SourceAdapterType SourceType => SourceAdapterType.Cbi;
     public override IReadOnlyList<string> Domains { get; } = ["cbi.ir"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.Snapshot, MarketDataType.OfficialFxRate];
 
     public CbiAdapter(
         HttpClient httpClient,

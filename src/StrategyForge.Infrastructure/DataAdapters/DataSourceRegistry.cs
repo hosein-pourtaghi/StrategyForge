@@ -7,8 +7,7 @@ using StrategyForge.Domain.Models;
 namespace StrategyForge.Infrastructure.DataAdapters;
 
 /// <summary>
-/// Manages all registered source adapters and handles fallback logic.
-/// Tries the primary source first; if it fails, tries compatible alternatives.
+/// Manages all registered source adapters and handles capability-aware source selection with fallback.
 /// </summary>
 public sealed class DataSourceRegistry : IDataSourceRegistry
 {
@@ -39,17 +38,35 @@ public sealed class DataSourceRegistry : IDataSourceRegistry
             .AsReadOnly();
     }
 
+    public IReadOnlyList<IDataSourceAdapter> GetAdaptersForCapability(
+        InstrumentMapping instrument,
+        MarketDataType dataType)
+    {
+        return _adapters
+            .Where(a => a.IsEnabled
+                && a.Supports(instrument)
+                && a.SupportedCapabilities.Contains(dataType))
+            .OrderByDescending(a =>
+            {
+                if (_healthCache.TryGetValue(a.SourceType, out var health) && !health.IsHealthy)
+                    return 0;
+                return 1;
+            })
+            .ThenBy(a => a.SourceType)
+            .ToList()
+            .AsReadOnly();
+    }
+
     public IDataSourceAdapter? GetBestAdapter(InstrumentMapping instrument)
     {
         return GetAdaptersForInstrument(instrument)
             .OrderByDescending(a =>
             {
-                // Prefer healthy adapters
                 if (_healthCache.TryGetValue(a.SourceType, out var health) && !health.IsHealthy)
                     return 0;
                 return 1;
             })
-            .ThenBy(a => a.SourceType) // Deterministic ordering
+            .ThenBy(a => a.SourceType)
             .FirstOrDefault();
     }
 
@@ -58,141 +75,78 @@ public sealed class DataSourceRegistry : IDataSourceRegistry
         return _adapters.FirstOrDefault(a => a.SourceType == sourceType && a.IsEnabled);
     }
 
-    public async Task<DataResult<IReadOnlyList<Candle>>> FetchHistoricalCandlesAsync(
+    public Task<DataResult<IReadOnlyList<Candle>>> FetchHistoricalCandlesAsync(
         InstrumentMapping instrument,
         DateOnly from,
         DateOnly to,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken cancellationToken = default)
     {
-        var supportedAdapters = GetAdaptersForInstrument(instrument);
-
-        if (supportedAdapters.Count == 0)
-        {
-            return DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2
+        return FetchWithFallbackAsync(
+            instrument,
+            MarketDataType.HistoricalCandles,
+            preferredSource,
+            selectionMode,
+            async adapter =>
             {
-                Code = "SOURCE_NOT_SUPPORTED",
-                Message = $"No enabled adapters support instrument {instrument.Symbol} ({instrument.InstrumentId})",
-                Retryable = false
-            });
-        }
-
-        // If a preferred source is specified, try it first
-        IDataSourceAdapter[] orderedAdapters;
-        if (preferredSource.HasValue)
-        {
-            var preferred = supportedAdapters.FirstOrDefault(a => a.SourceType == preferredSource.Value);
-            if (preferred != null)
-            {
-                orderedAdapters = [preferred, .. supportedAdapters.Where(a => a.SourceType != preferredSource.Value)];
-            }
-            else
-            {
-                orderedAdapters = [.. supportedAdapters];
-                _logger.LogWarning(
-                    "Preferred source {Preferred} not available for {Symbol}, using all available sources",
-                    preferredSource, instrument.Symbol);
-            }
-        }
-        else
-        {
-            orderedAdapters = [.. supportedAdapters];
-        }
-
-        // Try each adapter with fallback
-        DataResult<IReadOnlyList<Candle>>? lastResult = null;
-        foreach (var adapter in orderedAdapters)
-        {
-            _logger.LogDebug(
-                "Trying {Source} for historical candles of {Symbol}",
-                adapter.Name, instrument.Symbol);
-
-            var result = await adapter.GetHistoricalCandlesAsync(instrument, from, to, cancellationToken);
-
-            if (result.Ok)
-            {
-                _logger.LogInformation(
-                    "Successfully fetched {Count} candles from {Source} for {Symbol}",
-                    result.Data?.Count ?? 0, adapter.Name, instrument.Symbol);
-                return result;
-            }
-
-            lastResult = result;
-            _logger.LogWarning(
-                "Adapter {Source} failed for {Symbol}: {Error}",
-                adapter.Name, instrument.Symbol, result.Error?.Message);
-
-            // If error is not retryable and not a source failure, don't try fallback
-            if (result.Error != null && !result.Error.Retryable &&
-                result.Error.Code != "SOURCE_UNAVAILABLE" &&
-                result.Error.Code != "TIMEOUT")
-            {
-                break;
-            }
-        }
-
-        return lastResult ?? DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2
-        {
-            Code = "SOURCE_UNAVAILABLE",
-            Message = $"All adapters failed for {instrument.Symbol}",
-            Retryable = false
-        });
+                var result = await adapter.GetHistoricalCandlesAsync(instrument, from, to, cancellationToken);
+                return new DataResultWrapper<IReadOnlyList<Candle>>
+                {
+                    Result = result,
+                    SourceType = adapter.SourceType,
+                    AdapterName = adapter.Name
+                };
+            },
+            cancellationToken);
     }
 
-    public async Task<DataResult<Candle>> FetchLatestCandleAsync(
+    public Task<DataResult<Candle>> FetchLatestCandleAsync(
         InstrumentMapping instrument,
         SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
         CancellationToken cancellationToken = default)
     {
-        var supportedAdapters = GetAdaptersForInstrument(instrument);
-
-        if (supportedAdapters.Count == 0)
-        {
-            return DataResult<Candle>.Failure(new DataCollectionError2
+        return FetchWithFallbackAsync(
+            instrument,
+            MarketDataType.Snapshot,
+            preferredSource,
+            selectionMode,
+            async adapter =>
             {
-                Code = "SOURCE_NOT_SUPPORTED",
-                Message = $"No enabled adapters support instrument {instrument.Symbol}",
-                Retryable = false
-            });
-        }
+                var result = await adapter.GetLatestCandleAsync(instrument, cancellationToken);
+                return new DataResultWrapper<Candle>
+                {
+                    Result = result,
+                    SourceType = adapter.SourceType,
+                    AdapterName = adapter.Name
+                };
+            },
+            cancellationToken);
+    }
 
-        IDataSourceAdapter[] orderedAdapters;
-        if (preferredSource.HasValue)
-        {
-            var preferred = supportedAdapters.FirstOrDefault(a => a.SourceType == preferredSource.Value);
-            orderedAdapters = preferred != null
-                ? [preferred, .. supportedAdapters.Where(a => a.SourceType != preferredSource.Value)]
-                : [.. supportedAdapters];
-        }
-        else
-        {
-            orderedAdapters = [.. supportedAdapters];
-        }
-
-        DataResult<Candle>? lastResult = null;
-        foreach (var adapter in orderedAdapters)
-        {
-            var result = await adapter.GetLatestCandleAsync(instrument, cancellationToken);
-
-            if (result.Ok)
-                return result;
-
-            lastResult = result;
-
-            if (result.Error != null && !result.Error.Retryable &&
-                result.Error.Code != "SOURCE_UNAVAILABLE" &&
-                result.Error.Code != "TIMEOUT")
+    public Task<DataResult<OrderBook>> FetchOrderBookAsync(
+        InstrumentMapping instrument,
+        SourceAdapterType? preferredSource = null,
+        SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CancellationToken cancellationToken = default)
+    {
+        return FetchWithFallbackAsync(
+            instrument,
+            MarketDataType.OrderBook,
+            preferredSource,
+            selectionMode,
+            async adapter =>
             {
-                break;
-            }
-        }
-
-        return lastResult ?? DataResult<Candle>.Failure(new DataCollectionError2
-        {
-            Code = "SOURCE_UNAVAILABLE",
-            Message = $"All adapters failed for {instrument.Symbol}",
-            Retryable = false
-        });
+                var result = await adapter.GetOrderBookAsync(instrument, cancellationToken);
+                return new DataResultWrapper<OrderBook>
+                {
+                    Result = result,
+                    SourceType = adapter.SourceType,
+                    AdapterName = adapter.Name
+                };
+            },
+            cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<SourceAdapterType, AdapterHealthStatus>> GetAllHealthStatusesAsync(
@@ -222,5 +176,132 @@ public sealed class DataSourceRegistry : IDataSourceRegistry
         }
 
         return results;
+    }
+
+    // --- Internal helper types and methods ---
+
+    private sealed class DataResultWrapper<T>
+    {
+        public DataResult<T> Result { get; init; } = default!;
+        public SourceAdapterType SourceType { get; init; }
+        public string AdapterName { get; init; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Core fallback logic. Selects adapters based on capability, preferred source, and selection mode,
+    /// then tries each in order until one succeeds.
+    /// </summary>
+    private async Task<DataResult<T>> FetchWithFallbackAsync<T>(
+        InstrumentMapping instrument,
+        MarketDataType dataType,
+        SourceAdapterType? preferredSource,
+        SourceSelectionMode selectionMode,
+        Func<IDataSourceAdapter, Task<DataResultWrapper<T>>> fetchAction,
+        CancellationToken cancellationToken)
+    {
+        // Get adapters that support this instrument AND this data type
+        var compatibleAdapters = GetAdaptersForCapability(instrument, dataType);
+
+        if (compatibleAdapters.Count == 0)
+        {
+            return DataResult<T>.Failure(new DataCollectionError2
+            {
+                Code = "NO_COMPATIBLE_SOURCE",
+                Message = $"No enabled adapter supports {dataType} for instrument {instrument.Symbol} ({instrument.InstrumentId})",
+                Retryable = false
+            });
+        }
+
+        // Order adapters based on selection mode
+        IDataSourceAdapter[] orderedAdapters;
+        switch (selectionMode)
+        {
+            case SourceSelectionMode.PreferredOnly when preferredSource.HasValue:
+                orderedAdapters = compatibleAdapters
+                    .Where(a => a.SourceType == preferredSource.Value)
+                    .ToArray();
+                break;
+
+            case SourceSelectionMode.PreferredThenFallback when preferredSource.HasValue:
+                var preferred = compatibleAdapters
+                    .FirstOrDefault(a => a.SourceType == preferredSource.Value);
+                orderedAdapters = preferred != null
+                    ? [preferred, .. compatibleAdapters.Where(a => a.SourceType != preferredSource.Value)]
+                    : [.. compatibleAdapters];
+                break;
+
+            default:
+                orderedAdapters = [.. compatibleAdapters];
+                break;
+        }
+
+        if (orderedAdapters.Length == 0)
+        {
+            return DataResult<T>.Failure(new DataCollectionError2
+            {
+                Code = "NO_COMPATIBLE_SOURCE",
+                Message = $"No enabled adapter supports {dataType} for {instrument.Symbol} (preferred: {preferredSource})",
+                Retryable = false
+            });
+        }
+
+        // Try each adapter
+        DataResult<T>? lastResult = null;
+        foreach (var adapter in orderedAdapters)
+        {
+            _logger.LogDebug(
+                "Trying {Source} for {DataType} of {Symbol}",
+                adapter.Name, dataType, instrument.Symbol);
+
+            try
+            {
+                var wrapper = await fetchAction(adapter);
+
+                if (wrapper.Result.Ok)
+                {
+                    _logger.LogInformation(
+                        "Successfully fetched {DataType} from {Source} for {Symbol}",
+                        dataType, adapter.Name, instrument.Symbol);
+                    return wrapper.Result;
+                }
+
+                lastResult = wrapper.Result;
+                _logger.LogWarning(
+                    "Adapter {Source} failed for {Symbol} {DataType}: {Error}",
+                    adapter.Name, instrument.Symbol, dataType, wrapper.Result.Error?.Message);
+
+                // If error is not retryable, stop fallback
+                if (wrapper.Result.Error != null && !wrapper.Result.Error.Retryable)
+                {
+                    // AUTHENTICATION_REQUIRED and similar should stop fallback
+                    if (wrapper.Result.Error.Code is "AUTHENTICATION_REQUIRED"
+                        or "AUTHENTICATION_FAILED"
+                        or "UNSUPPORTED_CAPABILITY")
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Adapter {Source} threw exception for {Symbol} {DataType}",
+                    adapter.Name, instrument.Symbol, dataType);
+
+                lastResult = DataResult<T>.Failure(new DataCollectionError2
+                {
+                    Code = "SOURCE_UNAVAILABLE",
+                    Message = $"Exception from {adapter.Name}: {ex.Message}",
+                    Retryable = true
+                });
+            }
+        }
+
+        return lastResult ?? DataResult<T>.Failure(new DataCollectionError2
+        {
+            Code = "SOURCE_UNAVAILABLE",
+            Message = $"All compatible adapters failed for {dataType} of {instrument.Symbol}",
+            Retryable = false
+        });
     }
 }

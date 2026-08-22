@@ -37,6 +37,9 @@ public sealed record DataSourceSettings
     /// <summary>Default rate limit: requests per minute (configurable).</summary>
     public RateLimitSettings DefaultRateLimit { get; init; } = RateLimitSettings.Default;
 
+    /// <summary>Cross-source validation settings.</summary>
+    public CrossValidationSettings CrossValidation { get; init; } = new();
+
     // --- Per-Source Configuration ---
 
     /// <summary>Per-source adapter configurations.</summary>

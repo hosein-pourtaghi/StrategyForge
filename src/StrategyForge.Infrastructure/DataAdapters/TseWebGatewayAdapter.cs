@@ -32,6 +32,7 @@ public sealed class TseWebGatewayAdapter : BaseDataSourceAdapter
 {
     public override SourceAdapterType SourceType => SourceAdapterType.TseWebGateway;
     public override IReadOnlyList<string> Domains { get; } = ["cdn.tsetmc.com"];
+    public override IReadOnlyList<MarketDataType> SupportedCapabilities { get; } = [MarketDataType.Snapshot, MarketDataType.OrderBook, MarketDataType.InstrumentMetadata];
 
     public TseWebGatewayAdapter(
         HttpClient httpClient,
@@ -78,6 +79,81 @@ public sealed class TseWebGatewayAdapter : BaseDataSourceAdapter
 
         // Build candle from order book + instrument info
         return BuildCandle(sourceInstrumentId, orderBook, info);
+    }
+
+    /// <summary>
+    /// Overrides the base class to provide real order book data.
+    /// Parses TSE Web Gateway BestLimits response into canonical OrderBook model.
+    /// </summary>
+    protected override async Task<DataResult<OrderBook>> FetchOrderBookFromSourceAsync(
+        InstrumentMapping instrument,
+        CancellationToken cancellationToken)
+    {
+        var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
+        if (sourceId == null)
+        {
+            return DataResult<OrderBook>.Failure(new DataCollectionError2
+            {
+                Code = "PROVIDER_IDENTIFIER_NOT_FOUND",
+                Message = $"No TSE Web Gateway identifier found for {instrument.Symbol}",
+                Retryable = false
+            });
+        }
+
+        var rawBook = await FetchOrderBookAsync(sourceId.Id, cancellationToken);
+        if (rawBook == null)
+        {
+            return DataResult<OrderBook>.Failure(new DataCollectionError2
+            {
+                Code = "DATA_VALIDATION_FAILED",
+                Message = $"No order book data returned from TSE Web Gateway for {instrument.Symbol}",
+                Retryable = true,
+                SourceHttpStatus = 200
+            });
+        }
+
+        var bids = new List<OrderBookLevel>();
+        var asks = new List<OrderBookLevel>();
+
+        if (rawBook.Value.TryGetProperty("bestLimits", out var limits) && limits.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var level in limits.EnumerateArray())
+            {
+                var bidPrice = GetDecimal(level, "pd");
+                var bidQty = GetDecimal(level, "qd");
+                var askPrice = GetDecimal(level, "po");
+                var askQty = GetDecimal(level, "qo");
+
+                if (bidPrice.HasValue && bidQty.HasValue && bidQty > 0)
+                    bids.Add(new OrderBookLevel { Price = bidPrice.Value, Quantity = bidQty.Value });
+
+                if (askPrice.HasValue && askQty.HasValue && askQty > 0)
+                    asks.Add(new OrderBookLevel { Price = askPrice.Value, Quantity = askQty.Value });
+            }
+        }
+
+        // Sort bids descending (best bid = highest price first)
+        bids = bids.OrderByDescending(b => b.Price).ToList();
+        // Sort asks ascending (best ask = lowest price first)
+        asks = asks.OrderBy(a => a.Price).ToList();
+
+        var orderBook = new OrderBook
+        {
+            InstrumentId = instrument.InstrumentId,
+            Timestamp = DateTimeOffset.UtcNow,
+            Bids = bids.AsReadOnly(),
+            Asks = asks.AsReadOnly(),
+            Provenance = new DataProvenance
+            {
+                Source = SourceAdapterType.TseWebGateway,
+                SourceInstrumentId = sourceId.Id,
+                FetchedAtUtc = DateTimeOffset.UtcNow,
+                IsCached = false,
+                Endpoint = "BestLimits"
+            }
+        };
+
+        return DataResult<OrderBook>.Success(orderBook);
     }
 
     /// <summary>

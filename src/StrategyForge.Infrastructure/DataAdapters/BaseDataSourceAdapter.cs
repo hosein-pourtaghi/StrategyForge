@@ -32,6 +32,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
     public abstract SourceAdapterType SourceType { get; }
     public string Name { get; init; }
     public abstract IReadOnlyList<string> Domains { get; }
+    public abstract IReadOnlyList<MarketDataType> SupportedCapabilities { get; }
     public bool IsEnabled => Config.Enabled;
 
     protected BaseDataSourceAdapter(
@@ -99,6 +100,67 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
     }
 
     // --- Abstract methods for subclasses ---
+
+    /// <summary>
+    /// Default order book fetch returns unsupported. Override in adapters that provide order books.
+    /// </summary>
+    protected virtual Task<DataResult<OrderBook>> FetchOrderBookFromSourceAsync(
+        InstrumentMapping instrument,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(DataResult<OrderBook>.Failure(new DataCollectionError2
+        {
+            Code = "UNSUPPORTED_CAPABILITY",
+            Message = $"{Name} does not support order book data",
+            Retryable = false
+        }));
+    }
+
+    /// <summary>
+    /// Public order book fetch with full pipeline (auth, rate limit, cache, quality).
+    /// </summary>
+    public virtual Task<DataResult<OrderBook>> GetOrderBookAsync(
+        InstrumentMapping instrument,
+        CancellationToken cancellationToken = default)
+    {
+        return ExecuteWithResilienceAsync(
+            instrument,
+            "order_book",
+            async () =>
+            {
+                var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
+                if (sourceId == null)
+                {
+                    return DataResult<OrderBook>.Failure(new DataCollectionError2
+                    {
+                        Code = "PROVIDER_IDENTIFIER_NOT_FOUND",
+                        Message = $"No {Name} identifier found for instrument {instrument.Symbol}",
+                        Retryable = false
+                    });
+                }
+
+                var cacheKey = $"orderbook:{instrument.InstrumentId}:{SourceType}";
+                if (Cache.TryGet<OrderBook>(cacheKey, out var cached) && cached != null)
+                {
+                    Logger.LogDebug("Cache hit for {Source} order book: {Symbol}", SourceType, instrument.Symbol);
+                    return DataResult<OrderBook>.Success(cached, freshness: DataFreshness.Cached(DateTimeOffset.UtcNow.AddMinutes(Math.Min(Config.CacheMinutes, 2))), quality: DataQuality.Perfect, metadata: new AcquisitionMetadata { CacheHit = true, Sources = [Name] });
+                }
+
+                await RateLimiter.WaitForSlotAsync(GetSourceKey(), cancellationToken);
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var result = await FetchOrderBookFromSourceAsync(instrument, cancellationToken);
+                sw.Stop();
+
+                if (result.Ok && result.Data != null)
+                {
+                    Cache.Set(cacheKey, result.Data, TimeSpan.FromMinutes(Math.Min(Config.CacheMinutes, 2)));
+                }
+
+                return result;
+            },
+            cancellationToken);
+    }
 
     protected abstract Task<IReadOnlyList<Candle>> FetchCandlesFromSourceAsync(
         string sourceInstrumentId,

@@ -14,6 +14,8 @@ builder.Services.AddStrategyForgeInfrastructure(configuration);
 builder.Services.AddScoped<InstrumentService>();
 builder.Services.AddScoped<MarketDataService>();
 builder.Services.AddScoped<DataSourceService>();
+builder.Services.AddScoped<EvidenceQueryPipeline>();
+builder.Services.AddScoped<CrossSourceValidator>();
 
 // --- Controllers ---
 builder.Services.AddControllers();
