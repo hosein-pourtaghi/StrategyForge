@@ -822,7 +822,7 @@ public sealed record LlmSettings
 {
     public const string SectionName = "LlmSettings";
     public string Provider { get; init; } = "OpenAiCompatible";
-    public string BaseUrl { get; init; } = "http://localhost:11434/v1";
+    public string BaseUrl { get; init; } = "http://localhost:3000/v1";
     public string Model { get; init; } = "default";
     public string ApiKey { get; init; } = string.Empty;
     public int DefaultMaxTokens { get; init; } = 4096;

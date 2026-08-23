@@ -554,7 +554,7 @@ public interface IStrategyOrchestrator
 {
   "LlmSettings": {
     "Provider": "OpenAiCompatible",
-    "BaseUrl": "http://localhost:11434/v1",
+    "BaseUrl": "http://localhost:3000/v1",
     "Model": "default",
     "ApiKey": "",
     "DefaultMaxTokens": 4096,

@@ -12,8 +12,8 @@ public sealed record LlmSettings
     /// <summary>The LLM provider to use (e.g., "OpenAiCompatible").</summary>
     public string Provider { get; init; } = "OpenAiCompatible";
 
-    /// <summary>Base URL of the LLM API (e.g., "http://localhost:11434/v1").</summary>
-    public string BaseUrl { get; init; } = "http://localhost:11434/v1";
+    /// <summary>Base URL of the LLM API (e.g., "http://localhost:3000/v1").</summary>
+    public string BaseUrl { get; init; } = "http://localhost:3000/v1";
 
     /// <summary>The model identifier to use (e.g., "llama3", "gpt-4").</summary>
     public string Model { get; init; } = "default";

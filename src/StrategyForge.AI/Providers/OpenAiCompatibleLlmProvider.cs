@@ -16,8 +16,8 @@ public sealed record LlmProviderSettings
 {
     public const string SectionName = "LlmProvider";
 
-    /// <summary>Base URL for the OpenAI-compatible API (e.g., "http://localhost:11434/v1").</summary>
-    public string BaseUrl { get; init; } = "http://localhost:11434/v1";
+    /// <summary>Base URL for the OpenAI-compatible API (e.g., "http://localhost:3000/v1").</summary>
+    public string BaseUrl { get; init; } = "http://localhost:3000/v1";
 
     /// <summary>Model identifier (e.g., "llama3", "gpt-4").</summary>
     public string Model { get; init; } = "llama3";
@@ -38,7 +38,7 @@ public sealed record LlmProviderSettings
 /// <summary>
 /// OpenAI-compatible LLM provider. Works with:
 /// - OpenAI API
-/// - Ollama (http://localhost:11434/v1)
+/// - Ollama (http://localhost:3000/v1)
 /// - FreeLLMApi
 /// - Any OpenAI-compatible gateway
 /// 
