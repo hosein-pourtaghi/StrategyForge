@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using StrategyForge.AI.Services;
+using StrategyForge.Domain.Enums;
 using StrategyForge.Domain.Interfaces.AI;
 using StrategyForge.Domain.Interfaces.Orchestration;
 using StrategyForge.Domain.Models;
@@ -47,7 +49,7 @@ public sealed class StrategyAgent
     public async Task<StrategySynthesisOutcome> SynthesizeAsync(
         AnalysisEvidence evidence,
         IReadOnlyList<AgentAnalysisResult> agentResults,
-        IReadOnlyList<Enums.TimeHorizon>? requestedHorizons = null,
+        IReadOnlyList<TimeHorizon>? requestedHorizons = null,
         IReadOnlyList<string>? constraints = null,
         CancellationToken cancellationToken = default)
     {

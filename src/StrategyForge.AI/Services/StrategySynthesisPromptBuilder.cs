@@ -224,11 +224,11 @@ Respond with valid JSON matching this structure:
         if (context.Evidence.CompanyInfo != null)
         {
             sb.AppendLine("### Company Fundamentals");
-            sb.AppendLine($"- Name: {context.Evidence.CompanyInfo.Name}");
+            sb.AppendLine($"- Name: {context.Evidence.CompanyInfo.CompanyName}");
             if (context.Evidence.CompanyInfo.MarketCap.HasValue)
                 sb.AppendLine($"- Market Cap: {context.Evidence.CompanyInfo.MarketCap}");
-            if (context.Evidence.CompanyInfo.PE.HasValue)
-                sb.AppendLine($"- P/E Ratio: {context.Evidence.CompanyInfo.PE}");
+            if (context.Evidence.CompanyInfo.Pe.HasValue)
+                sb.AppendLine($"- P/E Ratio: {context.Evidence.CompanyInfo.Pe}");
             sb.AppendLine();
         }
 
@@ -261,8 +261,8 @@ Respond with valid JSON matching this structure:
             foreach (var news in context.Evidence.RecentNews.Take(10))
             {
                 sb.AppendLine($"- [{news.Source}] {news.Title}");
-                if (!string.IsNullOrEmpty(news.Summary))
-                    sb.AppendLine($"  {news.Summary}");
+                if (!string.IsNullOrEmpty(news.Content))
+                    sb.AppendLine($"  {news.Content}");
             }
             sb.AppendLine();
         }

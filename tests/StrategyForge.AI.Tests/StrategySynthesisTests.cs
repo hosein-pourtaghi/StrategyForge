@@ -890,7 +890,7 @@ public class HallucinationGuardrailTests
             ""executiveSummary"": {""overallSentiment"":""Neutral"",""summary"":""Test""},
             ""marketContext"": {""regime"":""Sideways"",""description"":""Test""},
             ""supportingEvidence"": [
-                {""content"": """, ""type"": ""Fact"", ""source"": ""Test""}
+                {""content"": """", ""type"": ""Fact"", ""source"": ""Test""}
             ]
         }";
 

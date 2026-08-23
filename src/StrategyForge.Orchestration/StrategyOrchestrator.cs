@@ -9,8 +9,16 @@ using StrategyForge.Domain.Models;
 namespace StrategyForge.Orchestration;
 
 /// <summary>
-/// Coordinates the full analysis pipeline:
+/// Coordinates the full analysis pipeline with observability and partial failure handling:
 /// Data Collection → Indicator Analysis → AI Agent Analysis → Strategy Synthesis
+/// 
+/// Phase 7 enhancements:
+/// - Pipeline execution state tracking
+/// - Structured diagnostics with timing and counts
+/// - Individual agent execution status (success, failure, timeout, cancelled)
+/// - Correlation ID for tracing across the pipeline
+/// - Cancellation propagation
+/// - Partial result handling (failed agents don't block successful ones)
 /// </summary>
 public sealed class StrategyOrchestrator : IStrategyOrchestrator
 {
@@ -54,98 +62,232 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
         Asset asset,
         CancellationToken cancellationToken = default)
     {
+        var executionId = Guid.NewGuid().ToString("N")[..12];
+        var pipelineStart = DateTimeOffset.UtcNow;
+        var warnings = new List<string>();
+
         _logger.LogInformation(
-            "Starting strategy generation for {Symbol} ({Name})",
-            asset.Symbol, asset.Name);
+            "[{ExecutionId}] Starting strategy generation for {Symbol} ({Name})",
+            executionId, asset.Symbol, asset.Name);
 
-        var startTime = DateTimeOffset.UtcNow;
-
-        // Step 1: Collect data
-        _logger.LogDebug("Step 1: Collecting market data");
-        var dataBundle = await CollectDataAsync(asset, cancellationToken);
-
-        // Step 2: Run analysis
-        _logger.LogDebug("Step 2: Running indicator analysis");
-        var evidence = await AnalyzeAsync(dataBundle, cancellationToken);
-
-        // Step 3: Run AI agents in parallel
-        // Agents are independent — parallel execution reduces total latency.
-        // Each agent failure is handled individually; one failure does not affect others.
-        _logger.LogDebug("Step 3: Running {AgentCount} AI agents in parallel", _agents.Count());
-
-        var agentTasks = _agents.Select(async agent =>
+        var diagnostics = new PipelineDiagnostics
         {
-            try
-            {
-                _logger.LogDebug("Running agent: {AgentName}", agent.Name);
-                return await agent.AnalyzeAsync(evidence, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Agent {AgentName} failed", agent.Name);
-                return (AgentAnalysisResult?)null;
-            }
-        });
-
-        var agentResults = (await Task.WhenAll(agentTasks))
-            .Where(r => r != null)
-            .Cast<AgentAnalysisResult>()
-            .ToList();
-
-        // Step 4: Strategy Synthesis
-        _logger.LogDebug("Step 4: Running strategy synthesis with {AgentCount} agent results", agentResults.Count);
-
-        var synthesisContext = new StrategyContext
-        {
-            Asset = asset,
-            AssembledAt = DateTimeOffset.UtcNow,
-            Evidence = evidence,
-            AgentResults = agentResults,
-            RequestedHorizons = [TimeHorizon.ShortTerm, TimeHorizon.MediumTerm, TimeHorizon.LongTerm]
+            ExecutionId = executionId,
+            State = PipelineState.Running,
+            StartedAt = pipelineStart
         };
 
-        var synthesisOutcome = await _synthesisService.SynthesizeAsync(synthesisContext, cancellationToken);
-
-        var duration = DateTimeOffset.UtcNow - startTime;
-
-        if (synthesisOutcome.Success && synthesisOutcome.Report != null)
+        try
         {
-            _logger.LogInformation(
-                "Strategy generation for {Symbol} completed in {Duration}ms",
-                asset.Symbol, duration.TotalMilliseconds);
-
-            return synthesisOutcome.Report with
+            // --- Stage 1: Data Collection ---
+            _logger.LogDebug("[{ExecutionId}] Step 1: Collecting market data", executionId);
+            var dataCollectionStart = DateTimeOffset.UtcNow;
+            var dataBundle = await CollectDataAsync(asset, cancellationToken);
+            diagnostics = diagnostics with
             {
-                GenerationDuration = duration
+                DataCollectionDuration = DateTimeOffset.UtcNow - dataCollectionStart,
+                SuccessfulDataProviders = dataBundle.SuccessfulProviders.Count,
+                FailedDataProviders = dataBundle.FailedProviders.Count
+            };
+
+            if (dataBundle.FailedProviders.Count > 0)
+            {
+                warnings.Add($"Data providers failed: {string.Join(", ", dataBundle.FailedProviders)}");
+            }
+
+            // --- Stage 2: Analysis ---
+            _logger.LogDebug("[{ExecutionId}] Step 2: Running indicator analysis", executionId);
+            var analysisStart = DateTimeOffset.UtcNow;
+            var evidence = await AnalyzeAsync(dataBundle, cancellationToken);
+            diagnostics = diagnostics with
+            {
+                AnalysisDuration = DateTimeOffset.UtcNow - analysisStart,
+                EvidenceCount = evidence.IndicatorValues.Count + evidence.RecentNews.Count
+            };
+
+            // --- Stage 3: Agent Execution (parallel) ---
+            _logger.LogDebug(
+                "[{ExecutionId}] Step 3: Running {AgentCount} AI agents in parallel",
+                executionId, _agents.Count());
+
+            var agentExecutionStart = DateTimeOffset.UtcNow;
+            var agentExecutionResults = await ExecuteAgentsAsync(
+                evidence, executionId, cancellationToken);
+            diagnostics = diagnostics with
+            {
+                AgentExecutionDuration = DateTimeOffset.UtcNow - agentExecutionStart,
+                AgentResults = agentExecutionResults
+            };
+
+            var successfulResults = agentExecutionResults
+                .Where(r => r.Status == AgentExecutionStatus.Success && r.Result != null)
+                .Select(r => r.Result!)
+                .ToList();
+
+            var failedAgents = agentExecutionResults
+                .Where(r => r.Status is AgentExecutionStatus.Failed
+                    or AgentExecutionStatus.Timeout)
+                .Select(r => r.AgentName)
+                .ToList();
+
+            if (failedAgents.Count > 0)
+            {
+                warnings.Add($"Agent failures: {string.Join(", ", failedAgents)}");
+            }
+
+            _logger.LogInformation(
+                "[{ExecutionId}] Agent execution complete: {Success}/{Total} succeeded",
+                executionId, successfulResults.Count, agentExecutionResults.Count);
+
+            // --- Stage 4: Strategy Synthesis ---
+            _logger.LogDebug(
+                "[{ExecutionId}] Step 4: Running strategy synthesis with {AgentCount} agent results",
+                executionId, successfulResults.Count);
+
+            var synthesisStart = DateTimeOffset.UtcNow;
+            var synthesisContext = new StrategyContext
+            {
+                Asset = asset,
+                AssembledAt = DateTimeOffset.UtcNow,
+                Evidence = evidence,
+                AgentResults = successfulResults,
+                RequestedHorizons = [TimeHorizon.ShortTerm, TimeHorizon.MediumTerm, TimeHorizon.LongTerm]
+            };
+
+            var synthesisOutcome = await _synthesisService.SynthesizeAsync(synthesisContext, cancellationToken);
+            diagnostics = diagnostics with
+            {
+                SynthesisDuration = DateTimeOffset.UtcNow - synthesisStart
+            };
+
+            var totalDuration = DateTimeOffset.UtcNow - pipelineStart;
+
+            // Determine final pipeline state
+            var finalState = DeterminePipelineState(
+                synthesisOutcome, successfulResults.Count, agentExecutionResults.Count,
+                dataBundle.SuccessfulProviders.Count, dataBundle.FailedProviders.Count);
+
+            diagnostics = diagnostics with
+            {
+                CompletedAt = DateTimeOffset.UtcNow,
+                TotalDuration = totalDuration,
+                State = finalState,
+                Warnings = warnings
+            };
+
+            _logger.LogInformation(
+                "[{ExecutionId}] Strategy generation for {Symbol} completed in {Duration}ms with state {State}",
+                executionId, asset.Symbol, totalDuration.TotalMilliseconds, finalState);
+
+            if (synthesisOutcome.Success && synthesisOutcome.Report != null)
+            {
+                return synthesisOutcome.Report with
+                {
+                    GenerationDuration = totalDuration,
+                    PipelineState = finalState,
+                    Diagnostics = diagnostics
+                };
+            }
+
+            // Synthesis failed — return minimal report with diagnostics
+            _logger.LogWarning(
+                "[{ExecutionId}] Strategy synthesis failed for {Symbol}: {Error}. Returning minimal report.",
+                executionId, asset.Symbol, synthesisOutcome.ErrorMessage);
+
+            return new StrategyReport
+            {
+                Asset = asset,
+                GeneratedAt = DateTimeOffset.UtcNow,
+                DataAsOf = dataBundle.DataEndTime ?? DateTimeOffset.UtcNow,
+                ExecutiveSummary = new ExecutiveSummary
+                {
+                    OverallSentiment = Sentiment.Unknown,
+                    Summary = $"Strategy synthesis failed: {synthesisOutcome.ErrorMessage}. " +
+                        $"Analysis evidence and {successfulResults.Count} agent results are available."
+                },
+                MarketContext = new MarketContext
+                {
+                    Regime = MarketRegime.Unknown,
+                    Description = "Market context analysis unavailable due to synthesis failure.",
+                    CurrentPrice = evidence.CurrentPrice
+                },
+                ContributingAgents = successfulResults.Select(a => a.AgentName).ToList(),
+                DataProvidersUsed = dataBundle.SuccessfulProviders.ToList(),
+                GenerationDuration = totalDuration,
+                PipelineState = finalState,
+                Diagnostics = diagnostics
             };
         }
-
-        // Fallback: Synthesis failed, return a minimal report with what we have
-        _logger.LogWarning(
-            "Strategy synthesis failed for {Symbol}: {Error}. Returning minimal report.",
-            asset.Symbol, synthesisOutcome.ErrorMessage);
-
-        return new StrategyReport
+        catch (OperationCanceledException)
         {
-            Asset = asset,
-            GeneratedAt = DateTimeOffset.UtcNow,
-            DataAsOf = dataBundle.DataEndTime ?? DateTimeOffset.UtcNow,
-            ExecutiveSummary = new ExecutiveSummary
+            var totalDuration = DateTimeOffset.UtcNow - pipelineStart;
+            diagnostics = diagnostics with
             {
-                OverallSentiment = Sentiment.Unknown,
-                Summary = $"Strategy synthesis failed: {synthesisOutcome.ErrorMessage}. " +
-                    $"Analysis evidence and {agentResults.Count} agent results are available."
-            },
-            MarketContext = new MarketContext
+                CompletedAt = DateTimeOffset.UtcNow,
+                TotalDuration = totalDuration,
+                State = PipelineState.Cancelled,
+                Warnings = warnings
+            };
+
+            _logger.LogWarning(
+                "[{ExecutionId}] Strategy generation for {Symbol} was cancelled after {Duration}ms",
+                executionId, asset.Symbol, totalDuration.TotalMilliseconds);
+
+            return new StrategyReport
             {
-                Regime = MarketRegime.Unknown,
-                Description = "Market context analysis unavailable due to synthesis failure.",
-                CurrentPrice = evidence.CurrentPrice
-            },
-            ContributingAgents = agentResults.Select(a => a.AgentName).ToList(),
-            DataProvidersUsed = dataBundle.SuccessfulProviders.ToList(),
-            GenerationDuration = duration
-        };
+                Asset = asset,
+                GeneratedAt = DateTimeOffset.UtcNow,
+                DataAsOf = DateTimeOffset.UtcNow,
+                ExecutiveSummary = new ExecutiveSummary
+                {
+                    OverallSentiment = Sentiment.Unknown,
+                    Summary = "Strategy generation was cancelled."
+                },
+                MarketContext = new MarketContext
+                {
+                    Regime = MarketRegime.Unknown,
+                    Description = "Pipeline was cancelled before completion."
+                },
+                GenerationDuration = totalDuration,
+                PipelineState = PipelineState.Cancelled,
+                Diagnostics = diagnostics
+            };
+        }
+        catch (Exception ex)
+        {
+            var totalDuration = DateTimeOffset.UtcNow - pipelineStart;
+            diagnostics = diagnostics with
+            {
+                CompletedAt = DateTimeOffset.UtcNow,
+                TotalDuration = totalDuration,
+                State = PipelineState.Failed,
+                Warnings = [.. warnings, $"Unexpected error: {ex.Message}"]
+            };
+
+            _logger.LogError(ex,
+                "[{ExecutionId}] Strategy generation for {Symbol} failed unexpectedly",
+                executionId, asset.Symbol);
+
+            return new StrategyReport
+            {
+                Asset = asset,
+                GeneratedAt = DateTimeOffset.UtcNow,
+                DataAsOf = DateTimeOffset.UtcNow,
+                ExecutiveSummary = new ExecutiveSummary
+                {
+                    OverallSentiment = Sentiment.Unknown,
+                    Summary = $"Strategy generation failed: {ex.Message}"
+                },
+                MarketContext = new MarketContext
+                {
+                    Regime = MarketRegime.Unknown,
+                    Description = "Pipeline failed due to an unexpected error."
+                },
+                GenerationDuration = totalDuration,
+                PipelineState = PipelineState.Failed,
+                Diagnostics = diagnostics
+            };
+        }
     }
 
     /// <inheritdoc/>
@@ -168,6 +310,10 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
                 candles = await provider.GetHistoricalDataAsync(asset, from, to, cancellationToken);
                 successfulProviders.Add(provider.Name);
                 break;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Propagate cancellation
             }
             catch (Exception ex)
             {
@@ -225,5 +371,120 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
         };
 
         return Task.FromResult(evidence);
+    }
+
+    /// <summary>
+    /// Executes all specialist agents in parallel with individual failure handling.
+    /// Each agent's execution is tracked independently — one failure does not affect others.
+    /// </summary>
+    private async Task<IReadOnlyList<AgentExecutionResult>> ExecuteAgentsAsync(
+        AnalysisEvidence evidence,
+        string executionId,
+        CancellationToken cancellationToken)
+    {
+        var agentList = _agents.ToList();
+        var results = new AgentExecutionResult[agentList.Count];
+
+        // Use index-based parallel execution to maintain agent-result association
+        var tasks = agentList.Select((agent, index) => Task.Run(async () =>
+        {
+            var agentStart = DateTimeOffset.UtcNow;
+
+            _logger.LogDebug("[{ExecutionId}] Running agent: {AgentName}", executionId, agent.Name);
+
+            try
+            {
+                var result = await agent.AnalyzeAsync(evidence, cancellationToken);
+
+                var agentDuration = DateTimeOffset.UtcNow - agentStart;
+
+                // Distinguish success from insufficient evidence
+                var status = result.Sentiment == Sentiment.Unknown && result.Confidence == 0m
+                    ? AgentExecutionStatus.InsufficientEvidence
+                    : AgentExecutionStatus.Success;
+
+                results[index] = new AgentExecutionResult
+                {
+                    Result = result,
+                    AgentName = agent.Name,
+                    Status = status,
+                    Duration = agentDuration,
+                    StartedAt = agentStart,
+                    CompletedAt = DateTimeOffset.UtcNow
+                };
+
+                _logger.LogInformation(
+                    "[{ExecutionId}] Agent {AgentName} completed: {Status} in {Duration}ms",
+                    executionId, agent.Name, status, agentDuration.TotalMilliseconds);
+            }
+            catch (OperationCanceledException)
+            {
+                results[index] = new AgentExecutionResult
+                {
+                    AgentName = agent.Name,
+                    Status = AgentExecutionStatus.Cancelled,
+                    Duration = DateTimeOffset.UtcNow - agentStart,
+                    ErrorMessage = "Agent execution was cancelled",
+                    StartedAt = agentStart,
+                    CompletedAt = DateTimeOffset.UtcNow
+                };
+
+                _logger.LogWarning(
+                    "[{ExecutionId}] Agent {AgentName} was cancelled",
+                    executionId, agent.Name);
+            }
+            catch (Exception ex)
+            {
+                results[index] = new AgentExecutionResult
+                {
+                    AgentName = agent.Name,
+                    Status = AgentExecutionStatus.Failed,
+                    Duration = DateTimeOffset.UtcNow - agentStart,
+                    ErrorMessage = ex.Message,
+                    StartedAt = agentStart,
+                    CompletedAt = DateTimeOffset.UtcNow
+                };
+
+                _logger.LogError(ex,
+                    "[{ExecutionId}] Agent {AgentName} failed: {Error}",
+                    executionId, agent.Name, ex.Message);
+            }
+        }));
+
+        await Task.WhenAll(tasks);
+
+        return results;
+    }
+
+    /// <summary>
+    /// Determines the final pipeline state based on synthesis outcome and agent results.
+    /// </summary>
+    private static PipelineState DeterminePipelineState(
+        StrategySynthesisOutcome synthesisOutcome,
+        int successfulAgents,
+        int totalAgents,
+        int successfulProviders,
+        int failedProviders)
+    {
+        // No agents produced results — critical input missing
+        if (totalAgents > 0 && successfulAgents == 0)
+            return PipelineState.PartiallyCompleted;
+
+        // Synthesis succeeded
+        if (synthesisOutcome.Success && synthesisOutcome.Report != null)
+        {
+            // Some agents or providers failed — completed with warnings
+            if (successfulAgents < totalAgents || failedProviders > 0)
+                return PipelineState.CompletedWithWarnings;
+
+            return PipelineState.Completed;
+        }
+
+        // Synthesis failed but we have some agent results
+        if (successfulAgents > 0)
+            return PipelineState.PartiallyCompleted;
+
+        // Nothing worked
+        return PipelineState.Failed;
     }
 }
