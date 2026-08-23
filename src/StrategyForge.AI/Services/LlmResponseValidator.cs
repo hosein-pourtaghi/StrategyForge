@@ -149,4 +149,18 @@ internal static class JsonElementExtensions
             .Select(x => x.GetString() ?? "")
             .ToList();
     }
+
+    /// <summary>
+    /// Reads an array element (already extracted by property) as a list of strings.
+    /// Use when the caller already has the array JsonElement.
+    /// </summary>
+    public static IReadOnlyList<string> TryGetArrayStrings(this JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+            return [];
+        return element.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString() ?? "")
+            .ToList();
+    }
 }

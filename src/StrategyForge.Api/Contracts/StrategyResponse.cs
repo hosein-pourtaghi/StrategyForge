@@ -297,4 +297,9 @@ public sealed record StrategyMetadataResponse
     public string? LlmModel { get; init; }
     public int TokensUsed { get; init; }
     public TimeSpan? Duration { get; init; }
+    public string? PipelineState { get; init; }
+    public string? ExecutionId { get; init; }
+    public int SuccessfulAgents { get; init; }
+    public int FailedAgents { get; init; }
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }

@@ -88,7 +88,12 @@ public class StrategyController : ControllerBase
                 {
                     LlmModel = report.LlmModel,
                     TokensUsed = report.TotalTokensUsed ?? 0,
-                    Duration = report.GenerationDuration
+                    Duration = report.GenerationDuration,
+                    PipelineState = report.PipelineState.ToString(),
+                    ExecutionId = report.Diagnostics?.ExecutionId,
+                    SuccessfulAgents = report.Diagnostics?.SuccessfulAgentCount ?? 0,
+                    FailedAgents = report.Diagnostics?.FailedAgentCount ?? 0,
+                    Warnings = report.Diagnostics?.Warnings ?? []
                 }
             });
         }

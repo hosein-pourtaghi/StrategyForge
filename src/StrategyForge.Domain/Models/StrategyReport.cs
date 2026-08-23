@@ -111,4 +111,10 @@ public sealed record StrategyReport
 
     /// <summary>Total time to generate this report.</summary>
     public TimeSpan? GenerationDuration { get; init; }
+
+    /// <summary>Pipeline execution state indicating success, partial, or failure.</summary>
+    public Enums.PipelineState PipelineState { get; init; } = Enums.PipelineState.Completed;
+
+    /// <summary>Structured diagnostics about the pipeline execution.</summary>
+    public PipelineDiagnostics? Diagnostics { get; init; }
 }
