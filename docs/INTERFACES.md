@@ -388,6 +388,38 @@ public interface IAgent
 
 ---
 
+### IStrategySynthesisService
+
+Strategy synthesis service (Phase 5).
+
+```csharp
+public interface IStrategySynthesisService
+{
+    Task<StrategySynthesisOutcome> SynthesizeAsync(
+        StrategyContext context,
+        CancellationToken cancellationToken = default);
+}
+```
+
+**Contract:**
+
+| Method | Returns | Behavior |
+|--------|---------|----------|
+| `SynthesizeAsync` | `StrategySynthesisOutcome` | Synthesized StrategyReport or error |
+
+**Implementation Rules:**
+- Build deterministic context from evidence + agent results
+- Construct prompt instructing LLM to reason only from provided context
+- Call LLM through existing ILLMProvider abstraction
+- Validate LLM response against application schema
+- Produce strongly typed StrategyReport with evidence traceability
+- Handle LLM failures gracefully (return error, not exception)
+- Never silently treat unsupported LLM output as factual evidence
+- Distinguish evidence from inference in the output
+- Support scenario-based reasoning (base, bull, bear cases)
+
+---
+
 ## 5. Orchestration Interface
 
 ### IStrategyOrchestrator

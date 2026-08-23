@@ -187,13 +187,51 @@ POST /api/assets
 
 ---
 
-### Generate Strategy
+### Generate Strategy (New — Phase 5)
+
+```
+POST /api/strategy/generate
+```
+
+**Description:** Generates a complete investment strategy proposal for an instrument.
+Runs the full pipeline: instrument resolution → data collection → indicator analysis → agent analysis → strategy synthesis.
+
+**Request Body:**
+```json
+{
+  "instrument": "فولاد",
+  "horizons": ["ShortTerm", "MediumTerm"],
+  "constraints": ["Max risk: Moderate"],
+  "focusArea": "Risk assessment"
+}
+```
+
+**Required Fields:**
+- `instrument` (string): Instrument query (Persian symbol, Latin symbol, numeric ID, or canonical ID)
+
+**Optional Fields:**
+- `horizons` (string[]): Time horizons to include (defaults to all)
+- `constraints` (string[]): Strategy constraints or focus areas
+- `focusArea` (string): Area of emphasis for the LLM
+
+**Response:** Strategy report with evidence traceability (see response model below)
+
+**Status Codes:**
+- `200 OK`: Strategy generated successfully
+- `400 Bad Request`: Invalid request parameters
+- `404 Not Found`: Instrument not found
+- `408 Request Timeout`: Generation timed out
+- `500 Internal Server Error`: Strategy generation failed
+
+---
+
+### Generate Strategy (Legacy)
 
 ```
 POST /api/strategy/{assetId}
 ```
 
-**Description:** Generates a complete strategy report for the specified asset.
+**Description:** Generates a complete strategy report for the specified asset (legacy endpoint).
 
 **Path Parameters:**
 - `assetId` (string, required): The asset's unique identifier

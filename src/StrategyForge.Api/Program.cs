@@ -1,8 +1,10 @@
 using StrategyForge.AI;
 using StrategyForge.AI.Providers;
+using StrategyForge.Analysis;
 using System.Reflection;
 using StrategyForge.Api.Services;
 using StrategyForge.Infrastructure;
+using StrategyForge.Orchestration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +13,9 @@ var configuration = builder.Configuration;
 
 // --- Core Infrastructure ---
 builder.Services.AddStrategyForgeInfrastructure(configuration);
+builder.Services.AddStrategyForgeAnalysis();
 builder.Services.AddStrategyForgeAI();
+builder.Services.AddStrategyForgeOrchestration();
 builder.Services.Configure<LlmProviderSettings>(configuration.GetSection(LlmProviderSettings.SectionName));
 
 // --- Application Services ---

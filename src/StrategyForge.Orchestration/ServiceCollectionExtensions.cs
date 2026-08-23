@@ -14,8 +14,8 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddStrategyForgeOrchestration(this IServiceCollection services)
     {
-        // Register the orchestrator
-        // services.AddSingleton<IStrategyOrchestrator, StrategyOrchestrator>();
+        // Register the orchestrator (Scoped to align with API controllers)
+        services.AddScoped<IStrategyOrchestrator, StrategyOrchestrator>();
 
         return services;
     }
