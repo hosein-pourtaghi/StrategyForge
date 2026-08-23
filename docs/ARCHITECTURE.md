@@ -1,7 +1,7 @@
 # StrategyForge — Architecture Document
 
-**Version:** 1.0  
-**Last Updated:** August 21, 2026
+**Version:** 1.1  
+**Last Updated:** August 23, 2026
 
 ---
 
@@ -249,20 +249,24 @@ Domain independence ensures core models and interfaces remain stable when extern
 
 ### 4.4 AI Layer (`StrategyForge.AI`)
 
-**Purpose:** LLM-powered agents and prompts.
+**Purpose:** LLM-powered agents, prompts, and strategy synthesis.
 
 **Dependencies:** `StrategyForge.Domain`
 
 **Contains:**
-- Agent implementations (TechnicalAnalyst, FundamentalAnalyst, etc.)
+- `SpecialistAgentBase` — base class for all specialist agents (Phase 6)
+- `AgentPromptBuilder` — shared prompt-building utilities with evidence scoping (Phase 6)
+- Specialist agent implementations: `TechnicalAnalyst`, `FundamentalAnalyst`, `MacroAnalyst`, `NewsAnalyst`, `PoliticalRiskAnalyst`, `RiskAnalyst` (Phase 6)
+- Strategy Agent and Strategy Synthesis Service (Phase 5)
 - LLM provider implementation (OpenAI-compatible)
-- Prompt templates
-- Response parsing and validation
+- Prompt templates (Phase 4 interpretation + Phase 5 synthesis)
+- Response parsing and validation (Phase 4 + Phase 5)
+- StrategyContextBuilder, StrategySynthesisPromptBuilder
 - DI extension methods
 
 ### 4.5 Orchestration Layer (`StrategyForge.Orchestration`)
 
-**Purpose:** Pipeline coordination.
+**Purpose:** Pipeline coordination including strategy synthesis.
 
 **Dependencies:** `StrategyForge.Domain`, `StrategyForge.Analysis`, `StrategyForge.AI`, `StrategyForge.Infrastructure`
 
@@ -272,6 +276,7 @@ Domain independence ensures core models and interfaces remain stable when extern
 - Data collection orchestration
 - Analysis orchestration
 - Agent orchestration
+- Strategy synthesis integration (Phase 5)
 - DI extension methods
 
 ### 4.6 API Layer (`StrategyForge.Api`)
@@ -282,7 +287,8 @@ Domain independence ensures core models and interfaces remain stable when extern
 
 **Contains:**
 - `Program.cs` with DI configuration
-- Controllers (Assets, Analysis, Strategy)
+- Controllers (Instruments, MarketData, DataSources, Strategy)
+- Strategy request/response contracts
 - Middleware
 - `appsettings.json` configuration
 - Swagger/OpenAPI documentation
@@ -319,17 +325,25 @@ Domain independence ensures core models and interfaces remain stable when extern
    - Build AnalysisEvidence
        │
        ▼
-5. SPECIALIZED AI AGENTS analyze evidence independently
-   - Each agent receives relevant portions of evidence
-   - Each agent calls LLM with structured prompt
-   - Each agent parses response into AgentAnalysisResult
+5. SPECIALIZED AI AGENTS analyze evidence independently (in parallel)
+   - Each agent receives evidence scoped to its specialization
+   - TechnicalAnalyst: indicators, price action, support/resistance
+   - FundamentalAnalyst: company financials, valuation, growth
+   - MacroAnalyst: economic indicators, FX, gold, monetary policy
+   - NewsAnalyst: recent news, event catalysts, sentiment
+   - PoliticalRiskAnalyst: geopolitical, sanctions, policy risk
+   - RiskAnalyst: cross-domain risk synthesis
+   - Each agent calls LLM via provider-independent abstraction
+   - Agent failures are handled individually (one failure does not affect others)
+   - Each agent produces structured AgentAnalysisResult with evidence traceability
        │
        ▼
-6. STRATEGY AGENT synthesizes all specialist outputs
-   - Receives all AgentAnalysisResult outputs
-   - Reasons about agreements and conflicts
-   - Constructs scenarios
-   - Produces StrategyReport
+6. STRATEGY SYNTHESIS SERVICE combines all specialist outputs
+   - Builds deterministic StrategyContext from evidence + agent results
+   - Constructs synthesis prompt with evidence traceability instructions
+   - Calls LLM via existing ILLMProvider abstraction
+   - Validates LLM response against application schema
+   - Produces structured StrategyReport with evidence references
        │
        ▼
 7. API returns StrategyReport to client
@@ -351,8 +365,14 @@ IndicatorResult[]
 AnalysisEvidence
     ↓ (Sent to agents)
 AgentAnalysisResult[]
-    ↓ (Strategy synthesis)
-StrategyReport
+    ↓ (Strategy synthesis - Phase 5)
+StrategyContext (evidence + agent results + constraints)
+    ↓ (LLM prompt construction)
+LlmRequest
+    ↓ (LLM processing)
+LlmResponse
+    ↓ (Response validation + schema validation)
+StrategyReport (structured, evidence-traceable)
 ```
 
 ---
@@ -451,6 +471,24 @@ public interface IIndicatorEngine
 ```
 
 ### 6.3 AI Interfaces
+
+#### IStrategySynthesisService
+
+```csharp
+public interface IStrategySynthesisService
+{
+    Task<StrategySynthesisOutcome> SynthesizeAsync(
+        StrategyContext context,
+        CancellationToken cancellationToken = default);
+}
+```
+
+**Contract:**
+- Builds deterministic context from inputs
+- Calls LLM through ILLMProvider abstraction
+- Validates response against application schema
+- Returns strongly typed StrategyReport or error
+- Never silently treats unsupported information as factual
 
 #### ILLMProvider
 

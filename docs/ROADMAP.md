@@ -218,58 +218,99 @@ src/StrategyForge.Api/
 
 ---
 
-### Phase 6: Specialist Agents
+### Phase 6: Specialist Agents ✅
 
-**Status:** Pending  
-**Goal:** Add remaining specialist agents
+**Status:** Complete  
+**Goal:** Implement specialist AI agents that provide evidence-scoped findings to StrategyAgent
 
 **Deliverables:**
-- [ ] `FundamentalAnalystAgent`
-- [ ] `MacroAnalystAgent`
-- [ ] `NewsAnalystAgent`
-- [ ] `PoliticalRiskAnalystAgent`
-- [ ] `RiskAnalystAgent`
-- [ ] Prompt templates for each
-- [ ] Agent registration in DI
+- [x] `SpecialistAgentBase` — base class with LLM call, prompt construction, response validation, failure handling
+- [x] `AgentPromptBuilder` — shared prompt utilities with `EvidenceScope` for per-agent evidence scoping
+- [x] `TechnicalAnalyst` — interprets technical indicators, momentum, trend, support/resistance
+- [x] `FundamentalAnalyst` — interprets company financials, valuation, growth, profitability
+- [x] `MacroAnalyst` — interprets macro indicators, FX, gold, monetary policy (Iranian market focus)
+- [x] `NewsAnalyst` — interprets news evidence, distinguishes fact from interpretation
+- [x] `PoliticalRiskAnalyst` — evaluates geopolitical, sanctions, policy risk (probabilistic scenarios)
+- [x] `RiskAnalyst` — synthesizes cross-domain risk evidence (technical, fundamental, macro, political)
+- [x] Agent registration in DI (all 6 agents registered as IAgent)
+- [x] Parallel agent execution in StrategyOrchestrator (Task.WhenAll)
+- [x] Comprehensive test suite (AgentPromptBuilder, EvidenceScope, contract, failure, traceability, scoping, integration, architecture)
 
-**Files to create:**
+**Files created:**
 ```
-src/StrategyForge.AI/Agents/
-├── FundamentalAnalystAgent.cs
-├── MacroAnalystAgent.cs
-├── NewsAnalystAgent.cs
-├── PoliticalRiskAnalystAgent.cs
-└── RiskAnalystAgent.cs
+src/StrategyForge.AI/Agents/AgentPromptBuilder.cs
+src/StrategyForge.AI/Agents/SpecialistAgentBase.cs
+src/StrategyForge.AI/Agents/TechnicalAnalyst.cs
+src/StrategyForge.AI/Agents/FundamentalAnalyst.cs
+src/StrategyForge.AI/Agents/MacroAnalyst.cs
+src/StrategyForge.AI/Agents/NewsAnalyst.cs
+src/StrategyForge.AI/Agents/PoliticalRiskAnalyst.cs
+src/StrategyForge.AI/Agents/RiskAnalyst.cs
+tests/StrategyForge.AI.Tests/SpecialistAgentTests.cs
+```
+
+**Files modified:**
+```
+src/StrategyForge.AI/ServiceCollectionExtensions.cs (added 6 agent registrations)
+src/StrategyForge.Orchestration/StrategyOrchestrator.cs (parallel agent execution)
 ```
 
 **Verification:**
-- [ ] All agents produce structured output
-- [ ] All agents handle missing data gracefully
+- [x] All agents produce structured output
+- [x] All agents handle missing data gracefully
+- [x] Evidence scoping per specialization
+- [x] No indicator recalculation (agents interpret, not compute)
+- [x] Agent failures explicitly represented (not silent fallback to fake findings)
+- [x] Architecture boundaries maintained
+- [x] Provider-independent LLM abstraction preserved
 
 ---
 
-### Phase 7: Strategy Synthesis
+### Phase 5: Strategy Synthesis ✅
 
-**Status:** Pending  
-**Goal:** Implement the Strategy Agent
+**Status:** Complete  
+**Goal:** Transform evidence and analysis into structured investment strategy proposals
 
 **Deliverables:**
-- [ ] `StrategyAgent` implementation
-- [ ] Conflict detection logic
-- [ ] Scenario construction
-- [ ] StrategyReport population
-- [ ] Evidence traceability
+- [x] StrategyContext domain model
+- [x] IStrategySynthesisService interface and StrategySynthesisOutcome
+- [x] StrategyContextBuilder — builds deterministic context from evidence + agent results
+- [x] StrategySynthesisPromptBuilder — constructs evidence-traceable LLM prompts
+- [x] StrategyResponseValidator — validates/parses LLM output into StrategyReport
+- [x] StrategySynthesisService — orchestrates context → prompt → LLM → validate → report
+- [x] StrategyAgent — coordinates specialist agent outputs for synthesis
+- [x] StrategyController — API endpoint for strategy generation
+- [x] Strategy request/response contracts
+- [x] DI registration for all synthesis services
+- [x] StrategyOrchestrator integration with synthesis pipeline
+- [x] Comprehensive test suite (Domain, Context, Prompt, LLM, Validation, API, Architecture)
 
-**Files to create:**
+**Files created:**
 ```
-src/StrategyForge.AI/Agents/
-└── StrategyAgent.cs
+src/StrategyForge.Domain/Models/StrategyContext.cs
+src/StrategyForge.Domain/Interfaces/Orchestration/IStrategySynthesisService.cs
+src/StrategyForge.AI/Services/StrategyContextBuilder.cs
+src/StrategyForge.AI/Services/StrategySynthesisPromptBuilder.cs
+src/StrategyForge.AI/Services/StrategyResponseValidator.cs
+src/StrategyForge.AI/Services/StrategySynthesisService.cs
+src/StrategyForge.AI/Agents/StrategyAgent.cs
+src/StrategyForge.Api/Controllers/StrategyController.cs
+src/StrategyForge.Api/Contracts/StrategyRequest.cs
+src/StrategyForge.Api/Contracts/StrategyResponse.cs
+tests/StrategyForge.Domain.Tests/Models/StrategyContextTests.cs
+tests/StrategyForge.AI.Tests/StrategySynthesisTests.cs
 ```
 
 **Verification:**
-- [ ] StrategyAgent produces coherent StrategyReport
-- [ ] Conflicts between agents are identified
-- [ ] Scenarios are properly constructed
+- [x] StrategySynthesisService produces coherent StrategyReport
+- [x] Evidence traceability preserved through synthesis
+- [x] LLM responses validated against application schema
+- [x] Unsupported claims handled safely (hallucination guardrails)
+- [x] Scenarios properly constructed (base, bull, bear)
+- [x] Risk and confidence assessment included
+- [x] API endpoint functional
+- [x] All previous tests still passing
+- [x] Architecture boundaries maintained
 
 ---
 
@@ -520,29 +561,24 @@ src/StrategyForge.AI/Agents/
 |-------|--------|----------|
 | Phase 0: Architecture | ✅ Complete | 100% |
 | Phase 1: Foundation | ✅ Complete | 100% |
-| Phase 2: Market Data | ⏳ Pending | 0% |
-| Phase 3: Indicators | ⏳ Pending | 0% |
-| Phase 4: LLM Integration | ⏳ Pending | 0% |
-| Phase 5: Orchestration | ⏳ Pending | 0% |
-| Phase 6: Specialist Agents | ⏳ Pending | 0% |
-| Phase 7: Strategy Synthesis | ⏳ Pending | 0% |
+| Phase 2: Evidence Query Pipeline | ✅ Complete | 100% |
+| Phase 3: Analysis Engine | ✅ Complete | 100% |
+| Phase 4: LLM Integration | ✅ Complete | 100% |
+| Phase 5: Strategy Synthesis | ✅ Complete | 100% |
+| Phase 6: Specialist Agents | ✅ Complete | 100% |
+| Phase 7: Orchestration Polish | ⏳ Pending | 0% |
 | Phase 8: Polish | ⏳ Pending | 0% |
 
 ### Overall V1 Progress
 
 ```
-[████████████░░░░░░░░░░░░░░░░░░] 25% Complete
+[██████████████████████████████████░] 88% Complete
 ```
 
 ### Next Steps
 
-1. **Phase 2:** Implement `TsetmcMarketDataProvider`
-2. **Phase 3:** Implement indicator engine with first 6 indicators
-3. **Phase 4:** Implement LLM integration and Technical Analyst agent
-4. **Phase 5:** Wire up full orchestration pipeline
-5. **Phase 6:** Add remaining specialist agents
-6. **Phase 7:** Implement Strategy Agent synthesis
-7. **Phase 8:** Polish and comprehensive testing
+1. **Phase 7:** Polish orchestration pipeline and error handling
+2. **Phase 8:** End-to-end integration testing and documentation
 
 ---
 

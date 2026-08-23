@@ -22,6 +22,7 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
     private readonly IEnumerable<IGoldPriceProvider> _goldProviders;
     private readonly IIndicatorEngine _indicatorEngine;
     private readonly IEnumerable<IAgent> _agents;
+    private readonly IStrategySynthesisService _synthesisService;
     private readonly ILogger<StrategyOrchestrator> _logger;
 
     public StrategyOrchestrator(
@@ -33,6 +34,7 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
         IEnumerable<IGoldPriceProvider> goldProviders,
         IIndicatorEngine indicatorEngine,
         IEnumerable<IAgent> agents,
+        IStrategySynthesisService synthesisService,
         ILogger<StrategyOrchestrator> logger)
     {
         _marketDataProviders = marketDataProviders;
@@ -43,6 +45,7 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
         _goldProviders = goldProviders;
         _indicatorEngine = indicatorEngine;
         _agents = agents;
+        _synthesisService = synthesisService;
         _logger = logger;
     }
 
@@ -65,31 +68,62 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
         _logger.LogDebug("Step 2: Running indicator analysis");
         var evidence = await AnalyzeAsync(dataBundle, cancellationToken);
 
-        // Step 3: Run AI agents
-        _logger.LogDebug("Step 3: Running {AgentCount} AI agents", _agents.Count());
-        var agentResults = new List<AgentAnalysisResult>();
-        foreach (var agent in _agents)
+        // Step 3: Run AI agents in parallel
+        // Agents are independent — parallel execution reduces total latency.
+        // Each agent failure is handled individually; one failure does not affect others.
+        _logger.LogDebug("Step 3: Running {AgentCount} AI agents in parallel", _agents.Count());
+
+        var agentTasks = _agents.Select(async agent =>
         {
             try
             {
                 _logger.LogDebug("Running agent: {AgentName}", agent.Name);
-                var result = await agent.AnalyzeAsync(evidence, cancellationToken);
-                agentResults.Add(result);
+                return await agent.AnalyzeAsync(evidence, cancellationToken);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Agent {AgentName} failed", agent.Name);
+                return (AgentAnalysisResult?)null;
             }
-        }
+        });
 
-        // Step 4: Build strategy report
-        // TODO: Implement Strategy Agent synthesis in Phase 7
-        _logger.LogDebug("Step 4: Building strategy report");
+        var agentResults = (await Task.WhenAll(agentTasks))
+            .Where(r => r != null)
+            .Cast<AgentAnalysisResult>()
+            .ToList();
+
+        // Step 4: Strategy Synthesis
+        _logger.LogDebug("Step 4: Running strategy synthesis with {AgentCount} agent results", agentResults.Count);
+
+        var synthesisContext = new StrategyContext
+        {
+            Asset = asset,
+            AssembledAt = DateTimeOffset.UtcNow,
+            Evidence = evidence,
+            AgentResults = agentResults,
+            RequestedHorizons = [TimeHorizon.ShortTerm, TimeHorizon.MediumTerm, TimeHorizon.LongTerm]
+        };
+
+        var synthesisOutcome = await _synthesisService.SynthesizeAsync(synthesisContext, cancellationToken);
 
         var duration = DateTimeOffset.UtcNow - startTime;
-        _logger.LogInformation(
-            "Strategy generation for {Symbol} completed in {Duration}ms",
-            asset.Symbol, duration.TotalMilliseconds);
+
+        if (synthesisOutcome.Success && synthesisOutcome.Report != null)
+        {
+            _logger.LogInformation(
+                "Strategy generation for {Symbol} completed in {Duration}ms",
+                asset.Symbol, duration.TotalMilliseconds);
+
+            return synthesisOutcome.Report with
+            {
+                GenerationDuration = duration
+            };
+        }
+
+        // Fallback: Synthesis failed, return a minimal report with what we have
+        _logger.LogWarning(
+            "Strategy synthesis failed for {Symbol}: {Error}. Returning minimal report.",
+            asset.Symbol, synthesisOutcome.ErrorMessage);
 
         return new StrategyReport
         {
@@ -99,12 +133,13 @@ public sealed class StrategyOrchestrator : IStrategyOrchestrator
             ExecutiveSummary = new ExecutiveSummary
             {
                 OverallSentiment = Sentiment.Unknown,
-                Summary = "Strategy generation pipeline is not yet fully implemented."
+                Summary = $"Strategy synthesis failed: {synthesisOutcome.ErrorMessage}. " +
+                    $"Analysis evidence and {agentResults.Count} agent results are available."
             },
             MarketContext = new MarketContext
             {
                 Regime = MarketRegime.Unknown,
-                Description = "Market context analysis not yet implemented.",
+                Description = "Market context analysis unavailable due to synthesis failure.",
                 CurrentPrice = evidence.CurrentPrice
             },
             ContributingAgents = agentResults.Select(a => a.AgentName).ToList(),
