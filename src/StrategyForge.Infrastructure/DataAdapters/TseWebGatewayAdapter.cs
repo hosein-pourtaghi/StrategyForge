@@ -53,6 +53,7 @@ public sealed class TseWebGatewayAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken)
     {
         // This adapter does not provide historical OHLC — use TsetmcAdapter for that.

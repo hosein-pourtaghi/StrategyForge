@@ -30,7 +30,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.NotNull(result.Data);
@@ -68,7 +68,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         var candle = result.Data![0];
@@ -92,7 +92,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.NotNull(result.Data);
@@ -123,7 +123,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.False(result.Ok);
         Assert.NotNull(result.Error);
@@ -147,7 +147,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         // With retry, callCount should be 1 (maxRetries=0) but the resilience wrapper catches it
         Assert.False(result.Ok);
@@ -171,7 +171,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.NotNull(result.Freshness);
@@ -201,11 +201,11 @@ public class TsetmcAdapterTests
         var to = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
 
         // First call: fetches from HTTP
-        var result1 = await adapter.GetHistoricalCandlesAsync(instrument, from, to, CancellationToken.None);
+        var result1 = await adapter.GetHistoricalCandlesAsync(instrument, from, to, null, CancellationToken.None);
         Assert.True(result1.Ok);
 
         // Second call: should come from cache
-        var result2 = await adapter.GetHistoricalCandlesAsync(instrument, from, to, CancellationToken.None);
+        var result2 = await adapter.GetHistoricalCandlesAsync(instrument, from, to, null, CancellationToken.None);
         Assert.True(result2.Ok);
         Assert.True(result2.Freshness!.IsCached);
         Assert.Equal(1, callCount); // Only one HTTP call made
@@ -250,7 +250,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         // Verify that provenance contains source info but not auth secrets
@@ -280,7 +280,7 @@ public class TsetmcAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         var candle = result.Data![0];

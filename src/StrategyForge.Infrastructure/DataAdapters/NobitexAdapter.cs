@@ -65,13 +65,15 @@ public sealed class NobitexAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken)
     {
         // Nobitex OHLC endpoint uses Unix timestamps (seconds)
         var fromUnix = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).ToUnixTimeSeconds();
         var toUnix = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).ToUnixTimeSeconds();
 
-        var url = $"/market/udf/history?symbol={sourceInstrumentId}&resolution=D&from={fromUnix}&to={toUnix}";
+                var resolutionStr = MapResolution(resolution);
+        var url = $"/market/udf/history?symbol={sourceInstrumentId}&resolution={resolutionStr}&from={fromUnix}&to={toUnix}";
 
         Logger.LogDebug("Fetching Nobitex OHLC data: {Url}", url);
 
@@ -88,7 +90,7 @@ public sealed class NobitexAdapter : BaseDataSourceAdapter
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var json = JsonDocument.Parse(content);
 
-        return ParseNobitexOhlc(json, sourceInstrumentId, from, to);
+        return ParseNobitexOhlc(json, sourceInstrumentId, from, to, resolutionStr);
     }
 
     protected override async Task<Candle?> FetchLatestCandleFromSourceAsync(
@@ -117,11 +119,30 @@ public sealed class NobitexAdapter : BaseDataSourceAdapter
         return ParseNobitexStats(json, sourceInstrumentId);
     }
 
+
+    /// <summary>
+    /// Maps CandleResolution to Nobitex API resolution string.
+    /// Nobitex supports: 1, 5, 15, 30, 60, 240, D, W, M
+    /// </summary>
+    private static string MapResolution(CandleResolution? resolution) => resolution switch
+    {
+        CandleResolution.Minute1 => "1",
+        CandleResolution.Minute5 => "5",
+        CandleResolution.Minute15 => "15",
+        CandleResolution.Minute30 => "30",
+        CandleResolution.Hour1 => "60",
+        CandleResolution.Hour4 => "240",
+        CandleResolution.Daily => "D",
+        CandleResolution.Weekly => "W",
+        CandleResolution.Monthly => "M",
+        _ => "D" // Default to daily
+    };
+
     /// <summary>
     /// Parses Nobitex OHLC UDF-format response into candles.
     /// Response format: { "s":"ok", "t":[...], "o":[...], "h":[...], "l":[...], "c":[...], "v":[...] }
     /// </summary>
-    private IReadOnlyList<Candle> ParseNobitexOhlc(JsonDocument json, string symbol, DateOnly from, DateOnly to)
+    private IReadOnlyList<Candle> ParseNobitexOhlc(JsonDocument json, string symbol, DateOnly from, DateOnly to, string resolutionStr)
     {
         var candles = new List<Candle>();
 
@@ -186,7 +207,8 @@ public sealed class NobitexAdapter : BaseDataSourceAdapter
                     ExtraFields = new Dictionary<string, string>
                     {
                         ["nobitexSymbol"] = symbol,
-                        ["rateType"] = "exchange"
+                        ["rateType"] = "exchange",
+                        ["resolution"] = resolutionStr
                     }
                 });
             }

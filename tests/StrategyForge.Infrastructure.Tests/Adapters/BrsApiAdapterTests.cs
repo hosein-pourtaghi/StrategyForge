@@ -106,7 +106,7 @@ public class BrsApiAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.Empty(result.Data!);

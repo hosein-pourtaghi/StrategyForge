@@ -81,6 +81,7 @@ public sealed class DataSourceRegistry : IDataSourceRegistry
         DateOnly to,
         SourceAdapterType? preferredSource = null,
         SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CandleResolution? resolution = null,
         CancellationToken cancellationToken = default)
     {
         return FetchWithFallbackAsync(
@@ -90,7 +91,7 @@ public sealed class DataSourceRegistry : IDataSourceRegistry
             selectionMode,
             async adapter =>
             {
-                var result = await adapter.GetHistoricalCandlesAsync(instrument, from, to, cancellationToken);
+                var result = await adapter.GetHistoricalCandlesAsync(instrument, from, to, resolution, cancellationToken);
                 return new DataResultWrapper<IReadOnlyList<Candle>>
                 {
                     Result = result,

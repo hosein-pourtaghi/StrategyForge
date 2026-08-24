@@ -50,6 +50,7 @@ public sealed class BrsApiAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken)
     {
         // BRSAPI does not provide historical OHLC data.

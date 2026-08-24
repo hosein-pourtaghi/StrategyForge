@@ -35,6 +35,7 @@ public interface IDataSourceAdapter
         InstrumentMapping instrument,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

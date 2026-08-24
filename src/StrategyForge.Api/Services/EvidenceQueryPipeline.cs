@@ -35,6 +35,7 @@ public sealed class EvidenceQueryPipeline
         DateOnly to,
         SourceAdapterType? preferredSource = null,
         SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CandleResolution? resolution = null,
         CancellationToken cancellationToken = default)
     {
         var instrument = await ResolveInstrumentAsync(instrumentQuery, cancellationToken);
@@ -60,7 +61,7 @@ public sealed class EvidenceQueryPipeline
         }
 
         return await _registry.FetchHistoricalCandlesAsync(
-            instrument, from, to, preferredSource, selectionMode, cancellationToken);
+            instrument, from, to, preferredSource, selectionMode, resolution, cancellationToken);
     }
 
     /// <summary>

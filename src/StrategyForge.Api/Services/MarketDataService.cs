@@ -25,10 +25,11 @@ public sealed class MarketDataService
         DateOnly to,
         SourceAdapterType? preferredSource = null,
         SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CandleResolution? resolution = null,
         CancellationToken ct = default)
     {
         var result = await _pipeline.GetHistoricalCandlesAsync(
-            instrumentQuery, from, to, preferredSource, selectionMode, ct);
+            instrumentQuery, from, to, preferredSource, selectionMode, resolution, ct);
         return MapCandlesResult(result);
     }
 
@@ -58,7 +59,7 @@ public sealed class MarketDataService
         DataResult<IReadOnlyList<Candle>> result) => new()
     {
         Ok = result.Ok,
-        Data = result.Data?.Select(MapCandle).ToList().AsReadOnly(),
+        Data = result.Data?.Select(c => MapCandle(c)).ToList().AsReadOnly(),
         Summary = result.Summary != null ? new DataMetadataResponse { Count = result.Summary.Count, Description = result.Summary.Description } : null,
         Freshness = result.Freshness != null ? new FreshnessResponse
         {
@@ -101,9 +102,10 @@ public sealed class MarketDataService
         Error = result.Error != null ? new ErrorDetailResponse { Code = result.Error.Code, Message = result.Error.Message, Retryable = result.Error.Retryable } : null
     };
 
-    private static CandleResponse MapCandle(Candle c) => new()
+    private static CandleResponse MapCandle(Candle c, string? resolution = null) => new()
     {
         Date = c.Date,
+        Resolution = resolution ?? c.ExtraFields?.GetValueOrDefault("resolution"),
         Open = c.Open,
         High = c.High,
         Low = c.Low,

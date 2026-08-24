@@ -46,6 +46,7 @@ public interface IDataSourceRegistry
         DateOnly to,
         SourceAdapterType? preferredSource = null,
         SourceSelectionMode selectionMode = SourceSelectionMode.BestAvailable,
+        CandleResolution? resolution = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

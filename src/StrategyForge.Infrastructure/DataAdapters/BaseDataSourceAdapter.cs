@@ -166,6 +166,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken);
 
     protected abstract Task<Candle?> FetchLatestCandleFromSourceAsync(
@@ -180,6 +181,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
         InstrumentMapping instrument,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution = null,
         CancellationToken cancellationToken = default)
     {
         return ExecuteWithResilienceAsync(
@@ -211,7 +213,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
 
                 // Fetch from source
                 var sw = Stopwatch.StartNew();
-                var candles = await FetchCandlesFromSourceAsync(sourceId.Id, from, to, cancellationToken);
+                var candles = await FetchCandlesFromSourceAsync(sourceId.Id, from, to, resolution, cancellationToken);
                 sw.Stop();
 
                 // Cache result

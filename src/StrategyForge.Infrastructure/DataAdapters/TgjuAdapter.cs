@@ -58,6 +58,7 @@ public sealed class TgjuAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken)
     {
         var url = $"/market/{sourceInstrumentId}";

@@ -8,6 +8,8 @@ namespace StrategyForge.Api.Contracts;
 public sealed record CandleResponse
 {
     public DateOnly Date { get; init; }
+    /// <summary>The candle resolution/interval (e.g., Daily, Hour1, Minute5).</summary>
+    public string? Resolution { get; init; }
     public decimal Open { get; init; }
     public decimal High { get; init; }
     public decimal Low { get; init; }

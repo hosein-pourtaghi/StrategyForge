@@ -88,7 +88,7 @@ public class DataSourceRegistryCapabilityTests
         t1.Setup(a => a.Supports(It.IsAny<InstrumentMapping>())).Returns(true);
         t1.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
-        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(SourceAdapterType.Tsetmc))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2 { Code = "SOURCE_UNAVAILABLE", Message = "Down", Retryable = true }));
 
@@ -101,7 +101,7 @@ public class DataSourceRegistryCapabilityTests
         t2.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
         var candles = new List<Candle> { new() { Date = DateOnly.FromDateTime(DateTime.Today), Open = 100, High = 110, Low = 90, Close = 105, Volume = 1000 } }.AsReadOnly();
-        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(SourceAdapterType.BrsApi))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Success(candles));
 
@@ -126,7 +126,7 @@ public class DataSourceRegistryCapabilityTests
         t1.Setup(a => a.Supports(It.IsAny<InstrumentMapping>())).Returns(true);
         t1.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
-        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2 { Code = "SOURCE_UNAVAILABLE", Message = "Down", Retryable = true }));
 
         var t2 = new Mock<IDataSourceAdapter>();
@@ -137,7 +137,7 @@ public class DataSourceRegistryCapabilityTests
         t2.Setup(a => a.Supports(It.IsAny<InstrumentMapping>())).Returns(true);
         t2.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
-        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Success(new List<Candle> { new() { Date = DateOnly.FromDateTime(DateTime.Today), Open = 100, High = 110, Low = 90, Close = 105, Volume = 1000 } }.AsReadOnly()));
 
         var reg = new DataSourceRegistry([t2.Object, t1.Object], _loggerMock.Object);
@@ -164,7 +164,7 @@ public class DataSourceRegistryCapabilityTests
         t1.Setup(a => a.Supports(It.IsAny<InstrumentMapping>())).Returns(true);
         t1.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
-        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t1.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(SourceAdapterType.Tsetmc))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2 { Code = "SOURCE_UNAVAILABLE", Message = "Down", Retryable = true }));
 
@@ -176,7 +176,7 @@ public class DataSourceRegistryCapabilityTests
         t2.Setup(a => a.Supports(It.IsAny<InstrumentMapping>())).Returns(true);
         t2.Setup(a => a.GetHealthAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdapterHealthStatus { IsHealthy = true });
-        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+        t2.Setup(a => a.GetHistoricalCandlesAsync(It.IsAny<InstrumentMapping>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<CandleResolution?>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add(SourceAdapterType.BrsApi))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Success(new List<Candle> { new() { Date = DateOnly.FromDateTime(DateTime.Today), Open = 100, High = 110, Low = 90, Close = 105, Volume = 1000 } }.AsReadOnly()));
 

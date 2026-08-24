@@ -34,7 +34,7 @@ public class NobitexAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.NotNull(result.Data);
@@ -70,7 +70,7 @@ public class NobitexAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         var candle = result.Data![0];
@@ -97,7 +97,7 @@ public class NobitexAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok); // Adapter returns empty list on error status
         Assert.Empty(result.Data!);
@@ -286,7 +286,7 @@ public class NobitexAdapterTests
             instrument,
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
             DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-            CancellationToken.None);
+            null, CancellationToken.None);
 
         Assert.True(result.Ok);
         Assert.NotNull(result.Freshness);

@@ -43,6 +43,7 @@ public sealed class CbiAdapter : BaseDataSourceAdapter
         string sourceInstrumentId,
         DateOnly from,
         DateOnly to,
+        CandleResolution? resolution,
         CancellationToken cancellationToken)
     {
         Logger.LogDebug("CBI adapter: historical candle data not directly available");

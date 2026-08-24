@@ -30,14 +30,14 @@ public class MarketDataControllerTests
     [Fact]
     public async Task GetCandles_NullInstrument_ReturnsBadRequest()
     {
-        var result = await _controller.GetCandles(null, null, null, null, CancellationToken.None);
+        var result = await _controller.GetCandles(null, null, null, null, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
     public async Task GetCandles_EmptyInstrument_ReturnsBadRequest()
     {
-        var result = await _controller.GetCandles("", null, null, null, CancellationToken.None);
+        var result = await _controller.GetCandles("", null, null, null, null, CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
@@ -49,6 +49,7 @@ public class MarketDataControllerTests
             new DateOnly(2025, 12, 31),
             new DateOnly(2025, 1, 1),
             null,
+            null,
             CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -59,7 +60,7 @@ public class MarketDataControllerTests
         _resolverMock.Setup(r => r.ResolveAsync("unknown", It.IsAny<CancellationToken>()))
             .ReturnsAsync((InstrumentMapping?)null);
 
-        var result = await _controller.GetCandles("unknown", null, null, null, CancellationToken.None);
+        var result = await _controller.GetCandles("unknown", null, null, null, null, CancellationToken.None);
         Assert.IsType<NotFoundObjectResult>(result);
     }
 
@@ -75,6 +76,7 @@ public class MarketDataControllerTests
                 It.IsAny<DateOnly>(),
                 It.IsAny<SourceAdapterType?>(),
                 It.IsAny<SourceSelectionMode>(),
+                It.IsAny<CandleResolution?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(DataResult<IReadOnlyList<Candle>>.Success(
                 new List<Candle>
@@ -82,7 +84,7 @@ public class MarketDataControllerTests
                     new() { Date = new DateOnly(2024, 1, 1), Open = 100, High = 110, Low = 90, Close = 105, Volume = 1000 }
                 }.AsReadOnly()));
 
-        var result = await _controller.GetCandles("فولاد", new DateOnly(2024, 1, 1), new DateOnly(2024, 1, 31), null, CancellationToken.None);
+        var result = await _controller.GetCandles("فولاد", new DateOnly(2024, 1, 1), new DateOnly(2024, 1, 31), null, null, CancellationToken.None);
         Assert.IsType<OkObjectResult>(result);
     }
 
