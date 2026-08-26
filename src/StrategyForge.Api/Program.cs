@@ -1,6 +1,7 @@
 using StrategyForge.AI;
 using StrategyForge.AI.Providers;
 using StrategyForge.Analysis;
+using StrategyForge.Domain.Configuration;
 using System.Reflection;
 using StrategyForge.Api.Services;
 using StrategyForge.Infrastructure;
@@ -17,6 +18,7 @@ builder.Services.AddStrategyForgeAnalysis();
 builder.Services.AddStrategyForgeAI();
 builder.Services.AddStrategyForgeOrchestration();
 builder.Services.Configure<LlmProviderSettings>(configuration.GetSection(LlmProviderSettings.SectionName));
+builder.Services.Configure<BackgroundSettings>(configuration.GetSection(BackgroundSettings.SectionName));
 
 // --- Application Services ---
 builder.Services.AddScoped<InstrumentService>();

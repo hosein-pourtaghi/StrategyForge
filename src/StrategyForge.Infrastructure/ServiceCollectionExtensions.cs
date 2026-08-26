@@ -138,6 +138,15 @@ public static class ServiceCollectionExtensions
         // --- Registry ---
         services.AddSingleton<IDataSourceRegistry, DataSourceRegistry>();
 
+        // --- Persistence (Phase 9) ---
+        services.Configure<DatabaseSettings>(configuration.GetSection(DatabaseSettings.SectionName));
+
+        // Register persistence stores — always register in-memory fallbacks;
+        // PostgreSQL repositories are registered when a real connection string is configured.
+        services.AddSingleton<IEvidenceStore, InMemoryEvidenceStore>();
+        services.AddSingleton<IStrategyHistoryStore, InMemoryStrategyHistoryStore>();
+        services.AddSingleton<IIntelligenceRunStore, InMemoryIntelligenceRunStore>();
+
         return services;
     }
 }

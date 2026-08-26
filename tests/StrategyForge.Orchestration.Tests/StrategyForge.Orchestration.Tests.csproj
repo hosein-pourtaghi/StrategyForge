@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\StrategyForge.Domain\StrategyForge.Domain.csproj" />
     <ProjectReference Include="..\..\src\StrategyForge.AI\StrategyForge.AI.csproj" />
     <ProjectReference Include="..\..\src\StrategyForge.Analysis\StrategyForge.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\StrategyForge.Infrastructure\StrategyForge.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\StrategyForge.Orchestration\StrategyForge.Orchestration.csproj" />
   </ItemGroup>
 
