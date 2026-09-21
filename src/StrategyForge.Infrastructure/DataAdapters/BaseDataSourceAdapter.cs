@@ -318,9 +318,31 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
                 if (lastResult.Error != null && !lastResult.Error.Retryable)
                     break;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                // Caller-requested cancellation — propagate as-is.
                 throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                // HttpClient surfaces request timeouts as OperationCanceledException/
+                // TaskCanceledException (not TimeoutException) when the caller's token
+                // is not cancelled. Convert to a typed, retryable failure so timeouts
+                // are handled through the normal retry/error pipeline.
+                Logger.LogWarning(ex,
+                    "Attempt {Attempt}/{MaxRetries} for {Source} {DataType} on {Symbol} timed out",
+                    attempt + 1, maxRetries, Name, dataType, instrument.Symbol);
+
+                _health.ConsecutiveFailures++;
+                _health.LastError = ex.Message;
+
+                lastResult = DataResult<T>.Failure(new DataCollectionError2
+                {
+                    Code = "SOURCE_TIMEOUT",
+                    Message = $"Request to {Name} timed out after {attempt + 1} attempt(s).",
+                    Retryable = true,
+                    OccurredAtUtc = DateTimeOffset.UtcNow
+                });
             }
             catch (Exception ex)
             {

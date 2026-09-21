@@ -126,7 +126,7 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
         {
             try
             {
-                var candle = ParseTsetmcCandleItem(item, insCode);
+                var candle = ParseTsetmcCandleItem(item, insCode, "closingPriceHistory");
                 if (candle != null)
                     candles.Add(candle);
             }
@@ -139,7 +139,7 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
         return candles.AsReadOnly();
     }
 
-    private Candle? ParseTsetmcCandleItem(JsonElement item, string insCode)
+    private Candle? ParseTsetmcCandleItem(JsonElement item, string insCode, string endpoint)
     {
         if (!item.TryGetProperty("dEven", out var dEvenProp))
             return null;
@@ -170,6 +170,7 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
         var volume = GetLong(item, "qTotTran5J");
         var value = GetDecimal(item, "qTotCap");
         var tradeCount = GetLong(item, "zTotTran");
+        var previousClose = GetDecimalOrNull(item, "priceYesterday");
 
         if (open <= 0 && close <= 0)
             return null;
@@ -185,8 +186,20 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
             SourceInstrumentId = insCode,
             FetchedAtUtc = DateTimeOffset.UtcNow,
             IsCached = false,
-            Endpoint = "closingPriceHistory"
+            Endpoint = endpoint
         };
+
+        var effectiveClose = close > 0 ? close : lastPrice;
+
+        var extraFields = new Dictionary<string, string>
+        {
+            ["tsetmcInsCode"] = insCode,
+            ["dEven"] = dEven.ToString()
+        };
+        if (previousClose is > 0)
+        {
+            extraFields["previousClose"] = previousClose.Value.ToString(CultureInfo.InvariantCulture);
+        }
 
         return new Candle
         {
@@ -194,21 +207,21 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
             Open = open,
             High = high,
             Low = low,
-            Close = close > 0 ? close : lastPrice,
+            Close = effectiveClose,
             Volume = volume,
             Value = value,
             TradeCount = tradeCount,
             LastPrice = lastPrice,
+            Change = previousClose is > 0 && effectiveClose > 0 ? effectiveClose - previousClose.Value : null,
+            ChangePercent = previousClose is > 0 && effectiveClose > 0
+                ? (effectiveClose - previousClose.Value) * 100m / previousClose.Value
+                : null,
             MarketTimezone = "Asia/Tehran",
             SourceDate = $"{jalaliYear}/{jalaliMonth:D2}/{jalaliDay:D2}",
             SourceCalendar = "jalali",
             Adjustment = DataAdjustment.Unadjusted,
             Provenance = provenance,
-            ExtraFields = new Dictionary<string, string>
-            {
-                ["tsetmcInsCode"] = insCode,
-                ["dEven"] = dEven.ToString()
-            }
+            ExtraFields = extraFields
         };
     }
 
@@ -220,7 +233,7 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
                 return null;
         }
 
-        return ParseTsetmcCandleItem(info, insCode);
+        return ParseTsetmcCandleItem(info, insCode, "closingPriceInfo");
     }
 
     private static decimal GetDecimal(JsonElement element, string propertyName)
@@ -235,6 +248,20 @@ public sealed class TsetmcAdapter : BaseDataSourceAdapter
             };
         }
         return 0;
+    }
+
+    private static decimal? GetDecimalOrNull(JsonElement element, string propertyName)
+    {
+        if (element.TryGetProperty(propertyName, out var prop))
+        {
+            return prop.ValueKind switch
+            {
+                JsonValueKind.Number => prop.GetDecimal(),
+                JsonValueKind.String => decimal.TryParse(prop.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var val) ? val : null,
+                _ => null
+            };
+        }
+        return null;
     }
 
     private static long GetLong(JsonElement element, string propertyName)
