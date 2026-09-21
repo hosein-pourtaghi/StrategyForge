@@ -69,7 +69,8 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<RateLimiter>(),
                 sp.GetRequiredService<InMemoryDataCache>(),
                 sp.GetRequiredService<DataQualityValidator>(),
-                sp.GetRequiredService<IDataSourceAuthenticator>());
+                sp.GetRequiredService<IDataSourceAuthenticator>(),
+                sp.GetRequiredService<JalaliCalendarService>());
         });
 
         services.AddTransient<CbiAdapter>(sp =>

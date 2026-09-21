@@ -190,7 +190,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
             async () =>
             {
                 var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
-                if (sourceId == null)
+                if (sourceId == null || string.IsNullOrWhiteSpace(sourceId.Id))
                 {
                     return DataResult<IReadOnlyList<Candle>>.Failure(new DataCollectionError2
                     {
@@ -238,7 +238,7 @@ public abstract class BaseDataSourceAdapter : IDataSourceAdapter
             async () =>
             {
                 var sourceId = instrument.SourceIdentifiers.GetValueOrDefault(SourceType);
-                if (sourceId == null)
+                if (sourceId == null || string.IsNullOrWhiteSpace(sourceId.Id))
                 {
                     return DataResult<Candle>.Failure(new DataCollectionError2
                     {

@@ -61,7 +61,7 @@ public sealed record DataSourceSettings
                 Name = "TGJU",
                 SourceType = SourceAdapterType.Tgju,
                 Enabled = true,
-                BaseUrl = "https://tgju.org",
+                BaseUrl = "https://api.tgju.org",
                 CacheMinutes = 5,
                 MaxRetries = 3,
                 Authentication = new AuthenticationSettings { Mode = AuthenticationMode.None }

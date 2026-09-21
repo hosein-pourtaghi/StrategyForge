@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -181,7 +182,8 @@ public static class TestInfrastructure
             CreateTestRateLimiter(),
             new InMemoryDataCache(),
             new DataQualityValidator(),
-            authenticator);
+            authenticator,
+            new JalaliCalendarService());
     }
 
     public static CbiAdapter CreateCbiAdapter(
@@ -273,6 +275,63 @@ public static class TestInfrastructure
         }
         """;
     }
+
+    // --- TGJU DataTables fixtures (verified live contract, 2026-09-21) ---
+
+    /// <summary>
+    /// Builds a verified-shape TGJU summary-table-data payload.
+    /// Row layout: [open, low, high, last, change, changePct, gregorian, jalali].
+    /// All cells are JSON strings; numerics use comma thousands separators;
+    /// change cells may carry HTML markup; rows are newest-first.
+    /// </summary>
+    public static string CreateTgjuTableJson(params (decimal Open, decimal Low, decimal High, decimal Last, decimal Change, decimal ChangePct, string Gregorian, string Jalali)[] rows)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var sb = new StringBuilder();
+        sb.AppendLine("{");
+        sb.AppendLine("  \"recordsTotal\": " + rows.Length + ",");
+        sb.AppendLine("  \"recordsFiltered\": " + rows.Length + ",");
+        sb.AppendLine("  \"data\": [");
+
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var r = rows[i];
+
+            // JSON payload renders the HTML markup exactly as the live API does:
+            // attribute quotes escaped as \" and the closing tag as <\/span>.
+            var changeCell = "\"<span class=\\\"high\\\" dir=\\\"ltr\\\">" + r.Change.ToString("N0", inv) + "<\\/span>\", ";
+            var pctCell = "\"<span class=\\\"high\\\" dir=\\\"ltr\\\">" + r.ChangePct.ToString("0.00", inv) + "%<\\/span>\", ";
+
+            sb.Append("    [\"" + r.Open.ToString("N0", inv) + "\", \"" + r.Low.ToString("N0", inv) + "\", \""
+                + r.High.ToString("N0", inv) + "\", \"" + r.Last.ToString("N0", inv) + "\", ");
+            sb.Append(changeCell);
+            sb.Append(pctCell);
+            sb.Append("\"" + r.Gregorian + "\", \"" + r.Jalali + "\"]");
+            if (i < rows.Length - 1) sb.Append(',');
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("  ]");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    /// <summary>Minimal single-row TGJU payload with plain (non-HTML) string numbers.</summary>
+    public static string CreateTgjuSingleRowJson(decimal open, decimal low, decimal high, decimal last, string gregorian, string jalali)
+    {
+        return $$"""
+        {
+          "recordsTotal": 1,
+          "data": [
+            ["{{open}}", "{{low}}", "{{high}}", "{{last}}", "{{last - open}}", "0.5%", "{{gregorian}}", "{{jalali}}"]
+          ]
+        }
+        """;
+    }
+
+    /// <summary>HTTP-500 HTML error body returned by api.tgju.org for unknown/dead slugs (observed live).</summary>
+    public static string CreateTgjuErrorJson() =>
+        "<!DOCTYPE html>\n<html><head><title>500</title></head><body>error</body></html>";
 
     public static string CreateCbiRateJson(string code, decimal rate, decimal? buyRate, decimal? sellRate)
     {
@@ -372,8 +431,9 @@ public static class TestInfrastructure
         QuoteCurrency = "IRR",
         SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
         {
-            [SourceAdapterType.Nobitex] = new SourceIdentifier { Id = "USDTIRT" },
-            [SourceAdapterType.Tgju] = new SourceIdentifier { Id = "price_tether" }
+            // TGJU identifier intentionally absent: no USDT-IRR slug exists on
+            // api.tgju.org (verified live 2026-09-21). Nobitex is the live source.
+            [SourceAdapterType.Nobitex] = new SourceIdentifier { Id = "USDTIRT" }
         }
     };
 
@@ -389,6 +449,38 @@ public static class TestInfrastructure
         SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
         {
             [SourceAdapterType.BrsApi] = new SourceIdentifier { Id = "4439113430858354" }
+        }
+    };
+
+    /// <summary>18K gold instrument mapped to the verified TGJU slug.</summary>
+    public static InstrumentMapping CreateTgjuGold18kInstrument() => new()
+    {
+        InstrumentId = "iran-commodity-gold-18k",
+        Symbol = "\u0633\u0643\u0647",
+        LatinSymbol = "Gold18K",
+        DisplayName = "18K Gold (Geram)",
+        AssetClass = AssetType.Commodity,
+        Exchange = "free_market",
+        QuoteCurrency = "IRR",
+        SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
+        {
+            [SourceAdapterType.Tgju] = new SourceIdentifier { Id = "geram18" }
+        }
+    };
+
+    /// <summary>Currency instrument whose TGJU identifier is present but empty — must fail typed, never issue a malformed URL.</summary>
+    public static InstrumentMapping CreateTgjuNoDateInstrument() => new()
+    {
+        InstrumentId = "iran-fx-no-date",
+        Symbol = "NO-DATE",
+        LatinSymbol = "NO-DATE/IRR",
+        DisplayName = "Unresolvable TGJU instrument",
+        AssetClass = AssetType.Currency,
+        Exchange = "free_market",
+        QuoteCurrency = "IRR",
+        SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
+        {
+            [SourceAdapterType.Tgju] = new SourceIdentifier { Id = "" }
         }
     };
 

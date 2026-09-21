@@ -251,33 +251,37 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             }
         });
 
-        Register(new InstrumentMapping
-        {
-            InstrumentId = "iran-fx-eur-irr-free",
-            Symbol = "یورو",
-            LatinSymbol = "EUR/IRR",
-            DisplayName = "EUR/IRR Free Market Rate",
-            AssetClass = AssetType.Currency,
-            Exchange = "free_market",
-            QuoteCurrency = "IRR",
-            SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
-            {
-                [SourceAdapterType.Tgju] = new() { Id = "price_euro", SourceSymbol = "price_euro", LastVerified = now }
-            }
-        });
+        // NOTE: EUR/IRR free-market is intentionally not seeded — no EUR-IRR slug
+        // exists on api.tgju.org (verified live 2026-09-21; every candidate returned
+        // HTTP 500), and inventing an identifier would fabricate market data.
 
         Register(new InstrumentMapping
         {
             InstrumentId = "iran-commodity-gold-18k",
             Symbol = "سکه",
             LatinSymbol = "Gold18K",
-            DisplayName = "18K Gold (Sekkeh)",
+            DisplayName = "18K Gold (Geram)",
             AssetClass = AssetType.Commodity,
             Exchange = "free_market",
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tgju] = new() { Id = "price_sekee", SourceSymbol = "price_sekee", LastVerified = now }
+                [SourceAdapterType.Tgju] = new() { Id = "geram18", SourceSymbol = "geram18", LastVerified = now }
+            }
+        });
+
+        Register(new InstrumentMapping
+        {
+            InstrumentId = "iran-commodity-coin-emami",
+            Symbol = "سکه امامی",
+            LatinSymbol = "CoinEmami",
+            DisplayName = "Emami Gold Coin",
+            AssetClass = AssetType.Commodity,
+            Exchange = "free_market",
+            QuoteCurrency = "IRR",
+            SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
+            {
+                [SourceAdapterType.Tgju] = new() { Id = "sekee", SourceSymbol = "sekee", LastVerified = now }
             }
         });
 
@@ -292,7 +296,7 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tgju] = new() { Id = "price_mesghal", SourceSymbol = "price_mesghal", LastVerified = now }
+                [SourceAdapterType.Tgju] = new() { Id = "mesghal", SourceSymbol = "mesghal", LastVerified = now }
             }
         });
 
@@ -307,7 +311,8 @@ public sealed class InMemoryInstrumentResolver : IInstrumentResolver
             QuoteCurrency = "IRR",
             SourceIdentifiers = new Dictionary<SourceAdapterType, SourceIdentifier>
             {
-                [SourceAdapterType.Tgju] = new() { Id = "price_tether", SourceSymbol = "price_tether", LastVerified = now },
+                // TGJU identifier intentionally absent: no USDT-IRR slug exists on
+                // api.tgju.org (verified live 2026-09-21). Nobitex is the live source.
                 [SourceAdapterType.Nobitex] = new() { Id = "USDTIRT", SourceSymbol = "USDTIRT", LastVerified = now }
             }
         });
