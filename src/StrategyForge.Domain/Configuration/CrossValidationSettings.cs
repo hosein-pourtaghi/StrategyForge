@@ -18,14 +18,16 @@ public sealed record CrossValidationSettings
 
     /// <summary>
     /// Maximum acceptable age difference between primary and secondary observations.
-    /// Default: 5 minutes.
+    /// Default: 5 minutes. Currently advisory — the date comparison is exact-match
+    /// on the canonical trading date; no separate staleness window is applied.
     /// </summary>
     public TimeSpan MaximumAgeDifference { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    /// Maximum acceptable price deviation percentage between sources.
-    /// If the deviation exceeds this, a quality flag is added.
-    /// Default: 2.0%.
+    /// Maximum acceptable relative price deviation (percent) between sources.
+    /// differencePercent = abs(primary - secondary) / primary * 100.
+    /// A difference exactly equal to the tolerance is within tolerance.
+    /// Default: 2.0% — conservative, deterministic, instrument-independent.
     /// </summary>
     public decimal MaximumPriceDeviationPercent { get; init; } = 2.0m;
 

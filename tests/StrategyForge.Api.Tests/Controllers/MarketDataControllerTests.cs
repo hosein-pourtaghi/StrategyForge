@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using StrategyForge.Api.Contracts;
 using StrategyForge.Api.Controllers;
 using StrategyForge.Api.Services;
+using StrategyForge.Domain.Configuration;
 using StrategyForge.Domain.Enums;
 using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
@@ -22,7 +24,13 @@ public class MarketDataControllerTests
         _resolverMock = new Mock<IInstrumentResolver>();
         _registryMock = new Mock<IDataSourceRegistry>();
         var pipelineLogger = new Mock<ILogger<EvidenceQueryPipeline>>();
-        var pipeline = new EvidenceQueryPipeline(_registryMock.Object, _resolverMock.Object, pipelineLogger.Object);
+        var validatorLogger = new Mock<ILogger<CrossSourceValidator>>();
+        var validator = new CrossSourceValidator(
+            _registryMock.Object,
+            Options.Create(new DataSourceSettings()),
+            validatorLogger.Object);
+        var pipeline = new EvidenceQueryPipeline(
+            _registryMock.Object, _resolverMock.Object, validator, pipelineLogger.Object);
         var service = new MarketDataService(pipeline);
         _controller = new MarketDataController(service);
     }

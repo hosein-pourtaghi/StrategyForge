@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
     {
         // --- Configuration ---
         services.Configure<DataSourceSettings>(configuration.GetSection(DataSourceSettings.SectionName));
+        services.Configure<HistoricalIngestionSettings>(configuration.GetSection(HistoricalIngestionSettings.SectionName));
 
         // --- Core Infrastructure Services (Singleton) ---
         services.AddSingleton<RateLimiter>();
@@ -147,6 +148,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEvidenceStore, InMemoryEvidenceStore>();
         services.AddSingleton<IStrategyHistoryStore, InMemoryStrategyHistoryStore>();
         services.AddSingleton<IIntelligenceRunStore, InMemoryIntelligenceRunStore>();
+
+        // --- Historical Dataset Pipeline (Phase 6) ---
+        // In-memory dataset store is the default; tests and development use it,
+        // and callers may replace the registration with the EF Core store when
+        // a real database is configured (mirrors the evidence-store pattern above).
+        services.AddSingleton<IHistoricalDatasetStore, InMemoryHistoricalDatasetStore>();
+        services.AddSingleton<HistoricalIngestionService>();
 
         return services;
     }

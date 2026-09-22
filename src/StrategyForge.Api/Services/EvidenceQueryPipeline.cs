@@ -8,20 +8,26 @@ namespace StrategyForge.Api.Services;
 /// <summary>
 /// Orchestrates market data acquisition: source selection, identifier resolution,
 /// fallback, pagination, and cross-validation. The single entry point for downstream modules.
+/// Cross-validation runs after a successful primary fetch when enabled via
+/// configuration; the primary data always remains canonical and is returned
+/// unchanged apart from an added discrepancy warning.
 /// </summary>
 public sealed class EvidenceQueryPipeline
 {
     private readonly IDataSourceRegistry _registry;
     private readonly IInstrumentResolver _resolver;
+    private readonly CrossSourceValidator _crossValidator;
     private readonly ILogger<EvidenceQueryPipeline> _logger;
 
     public EvidenceQueryPipeline(
         IDataSourceRegistry registry,
         IInstrumentResolver resolver,
+        CrossSourceValidator crossValidator,
         ILogger<EvidenceQueryPipeline> logger)
     {
         _registry = registry;
         _resolver = resolver;
+        _crossValidator = crossValidator;
         _logger = logger;
     }
 
@@ -60,8 +66,11 @@ public sealed class EvidenceQueryPipeline
             });
         }
 
-        return await _registry.FetchHistoricalCandlesAsync(
+        var result = await _registry.FetchHistoricalCandlesAsync(
             instrument, from, to, preferredSource, selectionMode, resolution, cancellationToken);
+
+        var validated = await _crossValidator.ValidateCandlesAsync(result, instrument, cancellationToken);
+        return validated.PrimaryResult;
     }
 
     /// <summary>
@@ -84,8 +93,11 @@ public sealed class EvidenceQueryPipeline
             });
         }
 
-        return await _registry.FetchLatestCandleAsync(
+        var result = await _registry.FetchLatestCandleAsync(
             instrument, preferredSource, selectionMode, cancellationToken);
+
+        var validated = await _crossValidator.ValidateSnapshotAsync(result, instrument, cancellationToken);
+        return validated.PrimaryResult;
     }
 
     /// <summary>
