@@ -11,6 +11,7 @@ namespace StrategyForge.Infrastructure.Data;
 /// - Strategies: Persisted strategy reports for historical tracking
 /// - IntelligenceRuns: Background intelligence run history
 /// - HistoricalDataset: normalized, idempotent historical market observations
+/// - EnrichedObservations: derived, idempotent analysis-ready observations
 /// 
 /// Configuration is loaded from DatabaseSettings (appsettings.json).
 /// </summary>
@@ -20,6 +21,7 @@ public class StrategyForgeDbContext : DbContext
     public DbSet<StrategyEntity> Strategies => Set<StrategyEntity>();
     public DbSet<IntelligenceRunEntity> IntelligenceRuns => Set<IntelligenceRunEntity>();
     public DbSet<HistoricalDatasetEntity> HistoricalDataset => Set<HistoricalDatasetEntity>();
+    public DbSet<EnrichedObservationEntity> EnrichedObservations => Set<EnrichedObservationEntity>();
 
     public StrategyForgeDbContext(DbContextOptions<StrategyForgeDbContext> options)
         : base(options)
@@ -99,6 +101,27 @@ public class StrategyForgeDbContext : DbContext
             entity.Property(e => e.AdjustmentType).HasMaxLength(30);
             entity.Property(e => e.AdjustmentSource).HasMaxLength(100);
             entity.Property(e => e.Endpoint).HasMaxLength(300);
+        });
+
+        // --- Enriched (Derived) Observations ---
+        modelBuilder.Entity<EnrichedObservationEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            // Idempotency boundary mirrors the raw dataset: one derived observation
+            // per (instrument, source, date). Re-processing updates in place.
+            entity.HasIndex(e => new { e.InstrumentId, e.Source, e.ObservationDate })
+                .IsUnique()
+                .HasDatabaseName("IX_EnrichedObservations_Identity");
+
+            entity.HasIndex(e => e.ObservationDate);
+
+            entity.Property(e => e.InstrumentId).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Source).HasMaxLength(40).IsRequired();
+            entity.Property(e => e.IndicatorsJson).IsRequired();
+            entity.Property(e => e.QualityStatus).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.WarningCodesJson).IsRequired();
+            entity.Property(e => e.ProcessedBy).HasMaxLength(40).IsRequired();
         });
     }
 }

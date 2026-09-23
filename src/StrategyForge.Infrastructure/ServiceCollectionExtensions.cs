@@ -156,6 +156,19 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHistoricalDatasetStore, InMemoryHistoricalDatasetStore>();
         services.AddSingleton<HistoricalIngestionService>();
 
+        // --- Historical Processing Pipeline (Phase 7) ---
+        // The in-memory dataset store also implements the paged reader used by the
+        // processing pipeline; when a real database is configured, callers replace
+        // IHistoricalDatasetStore (and this forwarded reader) with the EF Core
+        // implementations (HistoricalDatasetStore + HistoricalDatasetPageReader).
+        services.AddSingleton<IHistoricalDatasetPageReader>(sp =>
+            (IHistoricalDatasetPageReader)sp.GetRequiredService<IHistoricalDatasetStore>());
+        services.Configure<HistoricalProcessingSettings>(configuration.GetSection(HistoricalProcessingSettings.SectionName));
+        services.AddSingleton<HistoricalRowValidator>();
+        services.AddSingleton<IndicatorWarmupProber>();
+        services.AddSingleton<IEnrichedDatasetStore, InMemoryEnrichedDatasetStore>();
+        services.AddSingleton<HistoricalProcessingService>();
+
         return services;
     }
 }

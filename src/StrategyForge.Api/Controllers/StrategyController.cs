@@ -9,6 +9,10 @@ namespace StrategyForge.Api.Controllers;
 /// <summary>
 /// API for strategy generation and synthesis.
 /// Generates structured, evidence-driven investment strategy proposals.
+/// Also exposes the Phase 8 deterministic strategy layer: market regime
+/// classification, historical rule evaluation, and chronological splits.
+/// These endpoints are strictly analysis/research — they never produce
+/// buy/sell instructions, orders, or execution targets.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -17,13 +21,16 @@ public class StrategyController : ControllerBase
 {
     private readonly IStrategyOrchestrator _orchestrator;
     private readonly InstrumentService _instrumentService;
+    private readonly StrategyAnalysisApiService _strategyAnalysisService;
 
     public StrategyController(
         IStrategyOrchestrator orchestrator,
-        InstrumentService instrumentService)
+        InstrumentService instrumentService,
+        StrategyAnalysisApiService strategyAnalysisService)
     {
         _orchestrator = orchestrator;
         _instrumentService = instrumentService;
+        _strategyAnalysisService = strategyAnalysisService;
     }
 
     /// <summary>
@@ -119,5 +126,129 @@ public class StrategyController : ControllerBase
                 }
             });
         }
+    }
+
+    // =====================================================================
+    // Phase 8 — Deterministic strategy layer (no AI, no trading decisions)
+    // =====================================================================
+
+    /// <summary>
+    /// Classifies the deterministic market regime (trend / volatility / momentum)
+    /// for an instrument and source over the enriched historical dataset.
+    /// Regimes DESCRIBE the market — they are evidence, never trading decisions.
+    /// </summary>
+    /// <param name="instrument">Instrument query (canonical ID or resolvable symbol).</param>
+    /// <param name="source">Provider source (required; sources are never merged).</param>
+    /// <param name="from">Start date (inclusive, Gregorian). Defaults to one year ago.</param>
+    /// <param name="to">End date (inclusive, Gregorian). Defaults to today.</param>
+    /// <param name="take">Maximum regime snapshots returned (most recent first), 1–100. Default 30.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Regime classification returned (check Ok in the body).</response>
+    [HttpGet("regime")]
+    [ProducesResponseType(typeof(RegimeResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRegime(
+        [FromQuery] string? instrument,
+        [FromQuery] SourceAdapterType source,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] int take = 30,
+        CancellationToken ct = default)
+    {
+        take = Math.Clamp(take, 1, 100);
+
+        var response = await _strategyAnalysisService.GetRegimeAsync(
+            new RegimeQuery
+            {
+                Instrument = instrument,
+                Source = source,
+                From = from,
+                To = to,
+                Take = take
+            },
+            ct);
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Evaluates deterministic strategy rules over the enriched historical dataset
+    /// and returns forward-return statistics plus structured evidence for matched
+    /// observations. Look-ahead-safe: a rule at date D uses only information
+    /// available at D; future observations are used solely to measure outcomes.
+    /// These statistics describe historical behavior under the chosen evaluation
+    /// methodology — they do NOT prove profitability or predictive accuracy.
+    /// </summary>
+    /// <param name="request">Evaluation request (instrument, source, range, rules, horizons).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Evaluation completed (check Ok in the body).</response>
+    /// <response code="400">Invalid request parameters.</response>
+    [HttpPost("evaluate")]
+    [ProducesResponseType(typeof(StrategyEvaluateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Evaluate(
+        [FromBody] StrategyEvaluateRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Instrument))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid Request",
+                Detail = "Instrument parameter is required.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        if (!request.Source.HasValue)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid Request",
+                Detail = "Source parameter is required (sources are never merged).",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var response = await _strategyAnalysisService.EvaluateAsync(request, ct);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Computes the chronological Research / Validation / Holdout split of the
+    /// enriched observations. Splitting is strictly positional (past → future);
+    /// time-series data is never shuffled.
+    /// </summary>
+    /// <param name="instrument">Instrument query (canonical ID or resolvable symbol).</param>
+    /// <param name="source">Provider source (required; sources are never merged).</param>
+    /// <param name="from">Start date (inclusive, Gregorian).</param>
+    /// <param name="to">End date (inclusive, Gregorian).</param>
+    /// <param name="researchFraction">Research fraction (0–1). Default 0.6.</param>
+    /// <param name="validationFraction">Validation fraction (0–1). Default 0.2; remainder is holdout.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Split returned (check Ok in the body).</response>
+    [HttpGet("splits")]
+    [ProducesResponseType(typeof(SplitResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSplits(
+        [FromQuery] string? instrument,
+        [FromQuery] SourceAdapterType source,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] decimal? researchFraction,
+        [FromQuery] decimal? validationFraction,
+        CancellationToken ct = default)
+    {
+        var response = await _strategyAnalysisService.SplitAsync(
+            new SplitQuery
+            {
+                Instrument = instrument,
+                Source = source,
+                From = from,
+                To = to,
+                ResearchFraction = researchFraction,
+                ValidationFraction = validationFraction
+            },
+            ct);
+
+        return Ok(response);
     }
 }

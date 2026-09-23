@@ -26,6 +26,8 @@ builder.Services.AddScoped<MarketDataService>();
 builder.Services.AddScoped<DataSourceService>();
 builder.Services.AddScoped<EvidenceQueryPipeline>();
 builder.Services.AddScoped<CrossSourceValidator>();
+builder.Services.AddScoped<HistoricalProcessingApiService>();
+builder.Services.AddScoped<StrategyAnalysisApiService>();
 
 // --- Controllers ---
 builder.Services.AddControllers();
