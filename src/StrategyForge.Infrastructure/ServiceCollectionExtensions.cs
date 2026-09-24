@@ -169,6 +169,25 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEnrichedDatasetStore, InMemoryEnrichedDatasetStore>();
         services.AddSingleton<HistoricalProcessingService>();
 
+        // --- AI-Ready Dataset Preparation (Phase 9) ---
+        // In-memory enriched page reader mirrors the raw-dataset pattern: forwarded
+        // from the registered IEnrichedDatasetStore singleton in dev/test; replaced
+        // by the EF Core EnrichedDatasetPageReader when a real database is configured.
+        services.Configure<DatasetPreparationSettings>(configuration.GetSection(DatasetPreparationSettings.SectionName));
+        services.AddSingleton<IEnrichedDatasetPageReader>(sp =>
+        {
+            var store = sp.GetRequiredService<IEnrichedDatasetStore>();
+            return store is InMemoryEnrichedDatasetStore inMemory
+                ? new InMemoryEnrichedDatasetPageReader(inMemory)
+                : throw new InvalidOperationException(
+                    "No IEnrichedDatasetPageReader registered for the configured IEnrichedDatasetStore. " +
+                    "Register EnrichedDatasetPageReader (EF Core) when replacing the in-memory store.");
+        });
+        services.AddSingleton<AiReadyJsonlExporter>();
+        services.AddSingleton<DatasetReportsService>();
+        services.AddSingleton<DatasetPreparationService>();
+        services.AddSingleton<DatasetPreparationRunner>();
+
         return services;
     }
 }

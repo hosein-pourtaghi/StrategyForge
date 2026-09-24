@@ -6,8 +6,9 @@ namespace StrategyForge.Analysis;
 
 /// <summary>
 /// DI registration extension for the Analysis layer.
-/// Registers the indicator engine, all available indicators, and the
-/// Phase 8 deterministic strategy layer (rules + evaluation engine).
+/// Registers the indicator engine, all available indicators, the
+/// Phase 8 deterministic strategy layer (rules + evaluation engine), and the
+/// Phase 9 AI-ready dataset projection adapters behind Domain abstractions.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
@@ -34,6 +35,13 @@ public static class ServiceCollectionExtensions
         // deliberately not a generic rule-engine framework.
         services.AddSingleton<StrategyEvaluationEngine>(sp =>
             new StrategyEvaluationEngine(StrategyRuleRegistry.BuiltIn));
+
+        // --- AI-ready dataset projection (Phase 9) ---
+        // Registered behind Domain abstractions so Infrastructure depends on the
+        // abstraction, not on this project (dependency inversion, IIndicatorEngine pattern).
+        services.AddSingleton<IAiReadyDatasetProjector, Strategy.AiReadyProjector>();
+        services.AddSingleton<ITimeSeriesSplitter, Strategy.TimeSeriesSplitterAdapter>();
+        services.AddSingleton<IStrategyRuleRegistry, Strategy.BuiltInStrategyRuleRegistry>();
 
         return services;
     }

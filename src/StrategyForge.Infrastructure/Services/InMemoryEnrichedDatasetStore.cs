@@ -15,7 +15,7 @@ namespace StrategyForge.Infrastructure.Services;
 /// </summary>
 public sealed class InMemoryEnrichedDatasetStore : IEnrichedDatasetStore
 {
-    private sealed record ObservationKey(string InstrumentId, string Source, DateOnly Date);
+    internal sealed record ObservationKey(string InstrumentId, string Source, DateOnly Date);
 
     private readonly ConcurrentDictionary<ObservationKey, EnrichedObservation> _store = new();
 
@@ -114,6 +114,14 @@ public sealed class InMemoryEnrichedDatasetStore : IEnrichedDatasetStore
 
         return Task.FromResult(count);
     }
+
+    /// <summary>
+    /// Internal enumeration over all stored observations and their keys, used by
+    /// the in-memory paged reader (which shares this store's data in dev/test).
+    /// Not part of the <see cref="IEnrichedDatasetStore"/> contract.
+    /// </summary>
+    internal IEnumerable<(ObservationKey Key, EnrichedObservation Value)> EnumerateAll() =>
+        _store.Select(kv => (kv.Key, kv.Value));
 
     private static bool SameValues(EnrichedObservation a, EnrichedObservation b)
     {

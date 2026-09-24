@@ -244,7 +244,7 @@ public sealed class EnrichedDatasetStore : IEnrichedDatasetStore
             && string.Equals(entity.ProcessedBy, observation.ProcessedBy, StringComparison.Ordinal);
     }
 
-    private static EnrichedObservation MapToDomain(EnrichedObservationEntity e)
+    internal static EnrichedObservation MapToDomain(EnrichedObservationEntity e)
     {
         var indicators = DeserializeIndicators(e.IndicatorsJson);
         var warningCodes = DeserializeWarningCodes(e.WarningCodesJson);
