@@ -10,6 +10,8 @@ using StrategyForge.Domain.Interfaces.Analysis;
 using StrategyForge.Domain.Interfaces.Orchestration;
 using StrategyForge.Domain.Interfaces.Providers;
 using StrategyForge.Domain.Models;
+using StrategyForge.Infrastructure.Data;
+using StrategyForge.Infrastructure.Services;
 
 namespace StrategyForge.Integration.Tests;
 
@@ -115,6 +117,22 @@ public class StrategyForgeWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Keep dataset stores in-memory: E2E tests must not depend on PostgreSQL.
+            // (The API host registers EF Core persistence; tests restore the
+            // deterministic in-memory implementations used before persistence wiring.)
+            services.RemoveAll<IHistoricalDatasetStore>();
+            services.RemoveAll<IHistoricalDatasetPageReader>();
+            services.RemoveAll<IEnrichedDatasetStore>();
+            services.RemoveAll<IEnrichedDatasetPageReader>();
+            services.AddSingleton<IHistoricalDatasetStore, InMemoryHistoricalDatasetStore>();
+            services.AddSingleton<IEnrichedDatasetStore, InMemoryEnrichedDatasetStore>();
+            services.AddSingleton<IHistoricalDatasetPageReader>(sp =>
+                (IHistoricalDatasetPageReader)sp.GetRequiredService<IHistoricalDatasetStore>());
+            services.AddSingleton<IEnrichedDatasetPageReader>(sp =>
+                new InMemoryEnrichedDatasetPageReader(
+                    (InMemoryEnrichedDatasetStore)sp.GetRequiredService<IEnrichedDatasetStore>()));
+            services.RemoveAll<StrategyForgeDbContext>();
+
             // Remove all real IAgent registrations
             services.RemoveAll<IAgent>();
 

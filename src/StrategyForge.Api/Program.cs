@@ -3,8 +3,11 @@ using StrategyForge.AI.Providers;
 using StrategyForge.Analysis;
 using StrategyForge.Domain.Configuration;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StrategyForge.Api.Services;
 using StrategyForge.Infrastructure;
+using StrategyForge.Infrastructure.Data;
 using StrategyForge.Orchestration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +17,9 @@ var configuration = builder.Configuration;
 
 // --- Core Infrastructure ---
 builder.Services.AddStrategyForgeInfrastructure(configuration);
+// --- Persistence (PostgreSQL / EF Core): replaces the in-memory dataset stores
+// so historical + enriched datasets survive process restarts (Phase 6/7/9) ---
+builder.Services.AddStrategyForgePersistence(configuration);
 builder.Services.AddStrategyForgeAnalysis();
 builder.Services.AddStrategyForgeAI();
 builder.Services.AddStrategyForgeOrchestration();
@@ -74,6 +80,19 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 var app = builder.Build();
+
+// --- Schema: apply migrations at startup when configured (never in Testing) ---
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbSettings = scope.ServiceProvider.GetRequiredService<IOptions<DatabaseSettings>>().Value;
+        if (dbSettings.AutoMigrate)
+        {
+            scope.ServiceProvider.GetRequiredService<StrategyForgeDbContext>().Database.Migrate();
+        }
+    }
+}
 
 // --- Middleware ---
 if (app.Environment.IsDevelopment())

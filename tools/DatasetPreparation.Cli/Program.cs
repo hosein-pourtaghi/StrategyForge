@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -34,15 +35,28 @@ Directory.CreateDirectory(outputDir);
 
 var configuration = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(Directory.GetCurrentDirectory(), "src", "StrategyForge.Api", "appsettings.json"), optional: false)
+    // Twelve-factor-style override for local verification (e.g., a disposable Postgres):
+    // STRATEGYFORGE_CONNECTION_STRING takes precedence over appsettings.json.
+    .AddEnvironmentVariables()
     .Build();
 
 var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(configuration);
 services.AddLogging();
 services.AddStrategyForgeInfrastructure(configuration);
+// PostgreSQL persistence: stores must survive the process for re-run idempotency.
+services.AddStrategyForgePersistence(configuration);
 services.AddStrategyForgeAnalysis();
 
 await using var provider = services.BuildServiceProvider();
+
+// --- Schema: ensure the PostgreSQL schema exists (idempotent) ---
+using (var schemaScope = provider.CreateScope())
+{
+    await schemaScope.ServiceProvider
+        .GetRequiredService<StrategyForge.Infrastructure.Data.StrategyForgeDbContext>()
+        .Database.MigrateAsync();
+}
 
 var runner = provider.GetRequiredService<DatasetPreparationRunner>();
 
@@ -137,9 +151,38 @@ Console.WriteLine($"  Manifest: {manifestPath} ({new FileInfo(manifestPath).Leng
 
 Console.WriteLine();
 Console.WriteLine("--- First JSONL record ---");
-Console.WriteLine(File.ReadLines(jsonlPath).First());
+var firstLine = File.ReadLines(jsonlPath).FirstOrDefault();
+Console.WriteLine(firstLine ?? "(no records — dataset is empty)");
 
 var process = System.Diagnostics.Process.GetCurrentProcess();
 Console.WriteLine();
 Console.WriteLine($"PeakWorkingSet64: {process.PeakWorkingSet64:N0} bytes ({process.PeakWorkingSet64 / 1024.0 / 1024.0:N1} MiB)");
+
+// --- Stored-row evidence: proves persistence + re-run idempotency (no duplicate rows) ---
+if (args.Contains("--db-stats"))
+{
+    using (var statsScope = provider.CreateScope())
+    {
+        var db = statsScope.ServiceProvider
+            .GetRequiredService<StrategyForge.Infrastructure.Data.StrategyForgeDbContext>();
+
+        var rawRows = await db.HistoricalDataset.CountAsync();
+        var enrichedRows = await db.EnrichedObservations.CountAsync();
+        var distinctEnrichedIdentities = await db.EnrichedObservations
+            .Select(e => new { e.InstrumentId, e.Source, e.ObservationDate })
+            .Distinct()
+            .CountAsync();
+        var distinctProcessedBy = await db.EnrichedObservations
+            .Select(e => e.ProcessedBy)
+            .Distinct()
+            .ToListAsync();
+
+        Console.WriteLine();
+        Console.WriteLine("--- Stored rows (PostgreSQL) ---");
+        Console.WriteLine($"  HistoricalDataset rows:      {rawRows}");
+        Console.WriteLine($"  EnrichedObservations rows:   {enrichedRows}");
+        Console.WriteLine($"  Distinct identities:         {distinctEnrichedIdentities} (must equal rows — no duplicates)");
+        Console.WriteLine($"  Pipeline versions present:   {string.Join(", ", distinctProcessedBy)}");
+    }
+}
 return 0;
