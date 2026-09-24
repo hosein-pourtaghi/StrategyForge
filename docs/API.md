@@ -382,6 +382,77 @@ GET /api/strategy/{assetId}/latest
 
 ---
 
+### Generate Deterministic Setups (Phase 8)
+
+```
+POST /api/strategy/setups
+```
+
+**Description:** Generates deterministic strategy setups over the enriched
+historical dataset. A setup is structured evidence — direction/bias, entry and
+invalidation definitions, and risk metadata computed from stored indicator
+values. No LLM is involved; no trading instruction is produced.
+
+**Request Body:**
+
+```json
+{
+  "instrument": "USD/IRR",
+  "source": "Tgju",
+  "from": "2026-01-01",
+  "to": "2026-09-22",
+  "ruleNames": []
+}
+```
+
+- `instrument` (string, required): canonical ID or resolvable symbol
+- `source` (string, required): provider source; sources are never merged
+- `from`/`to` (date, optional): inclusive Gregorian range
+- `ruleNames` (array, optional): empty evaluates all built-in setup rules
+  (`TrendContinuation`, `MeanReversionPullback`)
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "instrumentId": "iran-fx-usd-irr-free",
+  "source": "Tgju",
+  "from": "2026-01-01",
+  "to": "2026-09-22",
+  "observationsEvaluated": 89,
+  "setups": [
+    {
+      "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-07-15",
+      "ruleName": "TrendContinuation",
+      "observationDate": "2026-07-15",
+      "direction": "Long",
+      "regime": { "trend": "Bullish", "volatility": "High", "momentum": "Strong", "close": 1882000 },
+      "entryCondition": "Close > SMA AND MACD > Signal AND MACD > 0 AND RSI >= TrendFollowingRsiMinimum",
+      "supportingEvidence": [ { "name": "RSI", "value": 67.8113, "comparison": "67.8113 >= 50 ✓" } ],
+      "invalidation": {
+        "condition": "MACD line crosses below Signal line",
+        "featureNames": ["MACD.MACD", "MACD.Signal"],
+        "referenceLevel": 29101.524649
+      },
+      "risk": { "rsi": 67.8113, "percentB": 0.927844, "bandwidthPercent": 19.555263, "closeVsSmaPercent": 1.2, "volatility": "High" },
+      "processedBy": "1.0.0"
+    }
+  ],
+  "setupsPerRule": { "TrendContinuation": 15 },
+  "skippedInsufficientEvidence": { "TrendContinuation": 33 },
+  "errorCode": null,
+  "errorMessage": null
+}
+```
+
+**Error Codes:** `NO_DATA`, `INSTRUMENT_NOT_FOUND`, `INVALID_REQUEST`
+
+**Determinism:** identical stored data + request ⇒ identical response, including
+`setupId` values and ordering (observation date, then rule name).
+
+---
+
 ## 5. Request/Response Models
 
 ### Asset

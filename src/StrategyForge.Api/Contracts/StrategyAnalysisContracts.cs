@@ -154,6 +154,99 @@ public sealed record StrategyEvaluateResponse
 }
 
 // ============================================================
+// Setup generation endpoint (POST api/Strategy/setups)
+// ============================================================
+
+/// <summary>Request body for the deterministic setup generation endpoint.</summary>
+public sealed record StrategySetupsRequest
+{
+    /// <summary>Instrument query (canonical ID or resolvable symbol).</summary>
+    public string? Instrument { get; init; }
+
+    /// <summary>Provider source (required; sources are never merged).</summary>
+    public SourceAdapterType? Source { get; init; }
+
+    /// <summary>Inclusive start date (Gregorian).</summary>
+    public DateOnly? From { get; init; }
+
+    /// <summary>Inclusive end date (Gregorian).</summary>
+    public DateOnly? To { get; init; }
+
+    /// <summary>Setup rule names to evaluate; empty evaluates all registered setup rules.</summary>
+    public IReadOnlyList<string> RuleNames { get; init; } = [];
+}
+
+/// <summary>One deterministic strategy setup (structured, provider-neutral, LLM-free).</summary>
+public sealed record StrategySetupResponse
+{
+    public string SetupId { get; init; } = "";
+    public string RuleName { get; init; } = "";
+    public string InstrumentId { get; init; } = "";
+    public string Source { get; init; } = "";
+    public DateOnly ObservationDate { get; init; }
+    public string Direction { get; init; } = "";
+
+    public RegimeSnapshotResponse Regime { get; init; } = new();
+    public string EntryCondition { get; init; } = "";
+
+    /// <summary>Structured evidence: actual stored values behind every supporting condition.</summary>
+    public IReadOnlyList<StrategyEvidenceItemResponse> SupportingEvidence { get; init; } = [];
+
+    public SetupInvalidationResponse Invalidation { get; init; } = new();
+    public SetupRiskResponse Risk { get; init; } = new();
+
+    /// <summary>Phase 7 pipeline version of the underlying enriched observation.</summary>
+    public string ProcessedBy { get; init; } = "";
+}
+
+/// <summary>Deterministic invalidation definition exposed to consumers.</summary>
+public sealed record SetupInvalidationResponse
+{
+    public string Condition { get; init; } = "";
+
+    /// <summary>Feature names the consumer must compare on later observations.</summary>
+    public IReadOnlyList<string> FeatureNames { get; init; } = [];
+
+    /// <summary>Numeric reference level captured at the setup observation; null when purely relational.</summary>
+    public decimal? ReferenceLevel { get; init; }
+}
+
+/// <summary>Deterministic risk/uncertainty metadata (actual values or null — never fabricated).</summary>
+public sealed record SetupRiskResponse
+{
+    public decimal? Rsi { get; init; }
+    public decimal? PercentB { get; init; }
+    public decimal? BandwidthPercent { get; init; }
+    public decimal? CloseVsSmaPercent { get; init; }
+    public string Volatility { get; init; } = "";
+}
+
+/// <summary>Response body for the setup generation endpoint.</summary>
+public sealed record StrategySetupsResponse
+{
+    public bool Ok { get; init; }
+    public string InstrumentId { get; init; } = "";
+    public string Source { get; init; } = "";
+    public DateOnly From { get; init; }
+    public DateOnly To { get; init; }
+    public int ObservationsEvaluated { get; init; }
+
+    /// <summary>Setups in deterministic order (observation date, then rule name).</summary>
+    public IReadOnlyList<StrategySetupResponse> Setups { get; init; } = [];
+
+    /// <summary>Setups per rule name (stable ordering by rule name ordinal).</summary>
+    public IReadOnlyDictionary<string, int> SetupsPerRule { get; init; }
+        = new Dictionary<string, int>();
+
+    /// <summary>Rule evaluations skipped because required evidence was unavailable.</summary>
+    public IReadOnlyDictionary<string, int> SkippedInsufficientEvidence { get; init; }
+        = new Dictionary<string, int>();
+
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+// ============================================================
 // Time-series split endpoint (GET api/Strategy/splits)
 // ============================================================
 

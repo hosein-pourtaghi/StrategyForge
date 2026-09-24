@@ -1,0 +1,887 @@
+[
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-07-15",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-07-15",
+    "close": 1882000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 3
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1736697.5,
+        "comparison": "1882000 \u003E SMA(1736697.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 41944.991837,
+        "comparison": "41944.991837 \u003E 29101.524649 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 41944.991837,
+        "comparison": "41944.991837 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 67.8113,
+        "comparison": "67.8113 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 12843.467188,
+        "comparison": "missing"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 29101.524649
+    },
+    "risk": {
+      "rsi": 67.8113,
+      "percentB": 0.927844,
+      "bandwidthPercent": 19.555263,
+      "closeVsSmaPercent": 8.366598,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-07-16",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-07-16",
+    "close": 1886000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 3
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1750597.5,
+        "comparison": "1886000 \u003E SMA(1750597.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 46160.104678,
+        "comparison": "46160.104678 \u003E 32513.240655 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 46160.104678,
+        "comparison": "46160.104678 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 68.1923,
+        "comparison": "68.1923 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 13646.864023,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 32513.240655
+    },
+    "risk": {
+      "rsi": 68.1923,
+      "percentB": 0.896008,
+      "bandwidthPercent": 19.531555,
+      "closeVsSmaPercent": 7.734645,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-07-18",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-07-18",
+    "close": 1945000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1768047.5,
+        "comparison": "1945000 \u003E SMA(1768047.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 53643.055141,
+        "comparison": "53643.055141 \u003E 36739.203552 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 53643.055141,
+        "comparison": "53643.055141 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 73.2260,
+        "comparison": "73.2260 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 16903.851589,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 36739.203552
+    },
+    "risk": {
+      "rsi": 73.2260,
+      "percentB": 1.003571,
+      "bandwidthPercent": 19.874758,
+      "closeVsSmaPercent": 10.008357,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-23",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-23",
+    "close": 1999000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1896097.5,
+        "comparison": "1999000 \u003E SMA(1896097.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 20349.765323,
+        "comparison": "20349.765323 \u003E 15164.620370 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 20349.765323,
+        "comparison": "20349.765323 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 70.9696,
+        "comparison": "70.9696 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 5185.144953,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 15164.620370
+    },
+    "risk": {
+      "rsi": 70.9696,
+      "percentB": 1.199643,
+      "bandwidthPercent": 7.756912,
+      "closeVsSmaPercent": 5.427068,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-24",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-24",
+    "close": 2021950,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1902095,
+        "comparison": "2021950 \u003E SMA(1902095) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 28253.665194,
+        "comparison": "28253.665194 \u003E 17782.429335 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 28253.665194,
+        "comparison": "28253.665194 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 73.2011,
+        "comparison": "73.2011 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 10471.235859,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 17782.429335
+    },
+    "risk": {
+      "rsi": 73.2011,
+      "percentB": 1.146827,
+      "bandwidthPercent": 9.741728,
+      "closeVsSmaPercent": 6.301210,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-25",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-25",
+    "close": 2005000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 3
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1905595,
+        "comparison": "2005000 \u003E SMA(1905595) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 32772.063495,
+        "comparison": "32772.063495 \u003E 20780.356167 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 32772.063495,
+        "comparison": "32772.063495 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 68.9835,
+        "comparison": "68.9835 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 11991.707328,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 20780.356167
+    },
+    "risk": {
+      "rsi": 68.9835,
+      "percentB": 0.984273,
+      "bandwidthPercent": 10.771772,
+      "closeVsSmaPercent": 5.216481,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-26",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-26",
+    "close": 2005000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 3
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1909645,
+        "comparison": "2005000 \u003E SMA(1909645) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 35938.648335,
+        "comparison": "35938.648335 \u003E 23812.014601 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 35938.648335,
+        "comparison": "35938.648335 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 68.9835,
+        "comparison": "68.9835 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 12126.633734,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 23812.014601
+    },
+    "risk": {
+      "rsi": 68.9835,
+      "percentB": 0.926894,
+      "bandwidthPercent": 11.696909,
+      "closeVsSmaPercent": 4.993336,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-29",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-29",
+    "close": 2060100,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1920600,
+        "comparison": "2060100 \u003E SMA(1920600) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 43656.783070,
+        "comparison": "43656.783070 \u003E 30065.414872 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 43656.783070,
+        "comparison": "43656.783070 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 74.8575,
+        "comparison": "74.8575 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 13591.368199,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 30065.414872
+    },
+    "risk": {
+      "rsi": 74.8575,
+      "percentB": 1.012386,
+      "bandwidthPercent": 14.175561,
+      "closeVsSmaPercent": 7.263355,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-08-31",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-08-31",
+    "close": 2093000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1928810,
+        "comparison": "2093000 \u003E SMA(1928810) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 50145.363249,
+        "comparison": "50145.363249 \u003E 34081.404547 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 50145.363249,
+        "comparison": "50145.363249 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 77.5900,
+        "comparison": "77.5900 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 16063.958702,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 34081.404547
+    },
+    "risk": {
+      "rsi": 77.5900,
+      "percentB": 1.024592,
+      "bandwidthPercent": 16.226897,
+      "closeVsSmaPercent": 8.512503,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-01",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-01",
+    "close": 2140000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1941810,
+        "comparison": "2140000 \u003E SMA(1941810) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 58406.839306,
+        "comparison": "58406.839306 \u003E 38946.491499 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 58406.839306,
+        "comparison": "58406.839306 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 80.8003,
+        "comparison": "80.8003 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 19460.347807,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 38946.491499
+    },
+    "risk": {
+      "rsi": 80.8003,
+      "percentB": 1.048276,
+      "bandwidthPercent": 18.615536,
+      "closeVsSmaPercent": 10.206457,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-02",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-02",
+    "close": 2199000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1957750,
+        "comparison": "2199000 \u003E SMA(1957750) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 68920.453433,
+        "comparison": "68920.453433 \u003E 44941.283886 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 68920.453433,
+        "comparison": "68920.453433 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 83.9153,
+        "comparison": "83.9153 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 23979.169547,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 44941.283886
+    },
+    "risk": {
+      "rsi": 83.9153,
+      "percentB": 1.070388,
+      "bandwidthPercent": 21.604281,
+      "closeVsSmaPercent": 12.322820,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-03",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-03",
+    "close": 2210600,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1975330,
+        "comparison": "2210600 \u003E SMA(1975330) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 77297.553351,
+        "comparison": "77297.553351 \u003E 51412.537779 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 77297.553351,
+        "comparison": "77297.553351 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 84.4495,
+        "comparison": "84.4495 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 25885.015572,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 51412.537779
+    },
+    "risk": {
+      "rsi": 84.4495,
+      "percentB": 1.002380,
+      "bandwidthPercent": 23.707963,
+      "closeVsSmaPercent": 11.910415,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-05",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-05",
+    "close": 2272050,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 1996232.5,
+        "comparison": "2272050 \u003E SMA(1996232.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 87881.918775,
+        "comparison": "87881.918775 \u003E 58706.413978 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 87881.918775,
+        "comparison": "87881.918775 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 86.9265,
+        "comparison": "86.9265 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 29175.504797,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 58706.413978
+    },
+    "risk": {
+      "rsi": 86.9265,
+      "percentB": 1.027210,
+      "bandwidthPercent": 26.207581,
+      "closeVsSmaPercent": 13.816903,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-09",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-09",
+    "close": 2327000,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 2074940,
+        "comparison": "2327000 \u003E SMA(2074940) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 103317.888169,
+        "comparison": "103317.888169 \u003E 81518.620568 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 103317.888169,
+        "comparison": "103317.888169 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 81.6862,
+        "comparison": "81.6862 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 21799.267601,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 81518.620568
+    },
+    "risk": {
+      "rsi": 81.6862,
+      "percentB": 0.922482,
+      "bandwidthPercent": 28.753475,
+      "closeVsSmaPercent": 12.147821,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  },
+  {
+    "setupId": "iran-fx-usd-irr-free|Tgju|TrendContinuation|2026-09-10",
+    "ruleName": "TrendContinuation",
+    "instrumentId": "iran-fx-usd-irr-free",
+    "source": 1,
+    "observationDate": "2026-09-10",
+    "close": 2359750,
+    "direction": 0,
+    "regime": {
+      "trend": 0,
+      "volatility": 2,
+      "momentum": 4
+    },
+    "entryCondition": "Close \u003E SMA AND MACD \u003E Signal AND MACD \u003E 0 AND RSI \u003E= TrendFollowingRsiMinimum",
+    "supportingEvidence": [
+      {
+        "name": "Close vs SMA",
+        "value": 2099677.5,
+        "comparison": "2359750 \u003E SMA(2099677.5) = True"
+      },
+      {
+        "name": "MACD vs Signal",
+        "value": 109874.627675,
+        "comparison": "109874.627675 \u003E 87189.821989 = True"
+      },
+      {
+        "name": "MACD line \u003E 0",
+        "value": 109874.627675,
+        "comparison": "109874.627675 \u003E 0 = True"
+      },
+      {
+        "name": "RSI",
+        "value": 83.0716,
+        "comparison": "83.0716 \u003E= 50 \u2713"
+      },
+      {
+        "name": "MACD Histogram rising",
+        "value": 22684.805685,
+        "comparison": "HistogramRising=True (exclusion applies only when false)"
+      }
+    ],
+    "invalidation": {
+      "condition": "MACD line crosses below Signal line",
+      "featureNames": [
+        "MACD.MACD",
+        "MACD.Signal"
+      ],
+      "referenceLevel": 87189.821989
+    },
+    "risk": {
+      "rsi": 83.0716,
+      "percentB": 0.923659,
+      "bandwidthPercent": 29.236498,
+      "closeVsSmaPercent": 12.386307,
+      "volatility": 2
+    },
+    "unavailableEvidence": [],
+    "processedBy": "1.0.0"
+  }
+]

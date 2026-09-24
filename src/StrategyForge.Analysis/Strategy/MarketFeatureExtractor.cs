@@ -48,8 +48,8 @@ public static class MarketFeatureExtractor
         if (indicators.TryGetValue("MACD", out var macd))
         {
             macdLine = macd.GetValueOrDefault("MACD");
-            macdSignal = macd.GetValueOrDefault("Signal");
-            macdHistogram = macd.GetValueOrDefault("Histogram");
+            macdSignal = macd.TryGetValue("Signal", out var sig) ? sig : null;
+            macdHistogram = macd.TryGetValue("Histogram", out var hist) ? hist : null;
         }
 
         decimal? bbUpper = null, bbMiddle = null, bbLower = null, bbBandwidth = null, bbPercentB = null;
@@ -75,8 +75,9 @@ public static class MarketFeatureExtractor
 
         var previousMacdHistogram = previous is not null
             && previous.Indicators.TryGetValue("MACD", out var prevMacd)
-            ? prevMacd.GetValueOrDefault("Histogram")
-            : (decimal?)null;
+            && prevMacd.TryGetValue("Histogram", out var prevHist)
+                ? prevHist
+                : (decimal?)null;
 
         var hasMeaningfulVolume = current.Volume > 0;
 

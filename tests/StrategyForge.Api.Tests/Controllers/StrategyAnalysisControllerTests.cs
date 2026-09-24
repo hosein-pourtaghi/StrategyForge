@@ -30,8 +30,9 @@ public class StrategyAnalysisControllerTests
     public StrategyAnalysisControllerTests()
     {
         var engine = new StrategyEvaluationEngine(StrategyRuleRegistry.BuiltIn);
+        var setupEngine = new StrategySetupEngine(SetupRuleRegistry.BuiltIn);
         var service = new StrategyAnalysisApiService(
-            _enrichedStore, _resolverMock.Object, engine);
+            _enrichedStore, _resolverMock.Object, engine, setupEngine);
         _controller = new StrategyController(
             Mock.Of<Domain.Interfaces.Orchestration.IStrategyOrchestrator>(),
             new InstrumentService(_resolverMock.Object),
@@ -298,5 +299,214 @@ public class StrategyAnalysisControllerTests
         var response = Assert.IsType<SplitResponse>(ok.Value);
         Assert.False(response.Ok);
         Assert.Equal("INVALID_REQUEST", response.ErrorCode);
+    }
+
+    // =====================================================================
+    // Setups endpoint (Phase 8 setup generation)
+    // =====================================================================
+
+    [Fact]
+    public async Task Setups_NullInstrument_ReturnsBadRequest()
+    {
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest { Source = SourceAdapterType.Tgju },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Setups_MissingSource_ReturnsBadRequest()
+    {
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest { Instrument = "usd-irr" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Setups_NoEnrichedData_ReturnsNoData()
+    {
+        SetupResolver();
+
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest
+            {
+                Instrument = "usd-irr",
+                Source = SourceAdapterType.Tgju,
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 1, 5)
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<StrategySetupsResponse>(ok.Value);
+        Assert.False(response.Ok);
+        Assert.Equal("NO_DATA", response.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Setups_WithQualifyingData_ReturnsStructuredSetupsWithProvenance()
+    {
+        SetupResolver();
+
+        // Seed a series with a strictly RISING MACD histogram so every day
+        // satisfies TrendContinuation (the flat-histogram series used elsewhere
+        // is correctly excluded from day 2 on — momentum must be improving).
+        var observations = Enumerable.Range(0, 5).Select(i => new EnrichedObservation
+        {
+            InstrumentId = InstrumentId,
+            Source = SourceAdapterType.Tgju,
+            ObservationDate = new DateOnly(2026, 1, 1).AddDays(i),
+            Open = 99m + i,
+            High = 101m + i,
+            Low = 98m + i,
+            Close = 100m + i,
+            Volume = 0,
+            Indicators = new Dictionary<string, IReadOnlyDictionary<string, decimal>>
+            {
+                ["SMA"] = new Dictionary<string, decimal> { ["SMA"] = 90m },
+                ["RSI"] = new Dictionary<string, decimal> { ["RSI"] = 60m },
+                ["MACD"] = new Dictionary<string, decimal>
+                {
+                    ["MACD"] = 2m, ["Signal"] = 1m, ["Histogram"] = 1m + i
+                }
+            },
+            QualityStatus = HistoricalDataQualityStatus.Valid,
+            ProcessedBy = "test"
+        }).ToList();
+        await _enrichedStore.UpsertEnrichedAsync(InstrumentId, SourceAdapterType.Tgju, observations);
+
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest
+            {
+                Instrument = "usd-irr",
+                Source = SourceAdapterType.Tgju,
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 1, 5)
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<StrategySetupsResponse>(ok.Value);
+        Assert.True(response.Ok);
+        Assert.Equal(5, response.ObservationsEvaluated);
+        Assert.Equal(5, response.Setups.Count);
+
+        // Every setup is fully traceable to the dataset identity.
+        Assert.All(response.Setups, s =>
+        {
+            Assert.Equal(InstrumentId, s.InstrumentId);
+            Assert.Equal("Tgju", s.Source);
+            Assert.Equal("TrendContinuation", s.RuleName);
+            Assert.Equal("test", s.ProcessedBy);
+            Assert.StartsWith($"{InstrumentId}|Tgju|TrendContinuation|", s.SetupId);
+            Assert.NotEmpty(s.EntryCondition);
+            Assert.NotEmpty(s.Invalidation.Condition);
+            Assert.NotEmpty(s.SupportingEvidence);
+        });
+
+        Assert.Equal(5, response.SetupsPerRule.GetValueOrDefault("TrendContinuation"));
+    }
+
+    [Fact]
+    public async Task Setups_FlatHistogram_ExcludedFromSecondDayOn()
+    {
+        SetupResolver();
+        await SeedEnrichedAsync(5, new DateOnly(2026, 1, 1), SourceAdapterType.Tgju);
+
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest
+            {
+                Instrument = "usd-irr",
+                Source = SourceAdapterType.Tgju,
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 1, 5)
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<StrategySetupsResponse>(ok.Value);
+        Assert.True(response.Ok);
+
+        // Day 1 has no predecessor (no falling evidence) → setup emitted.
+        // Days 2–5: histogram flat (not rising) → continuation excluded.
+        var setup = Assert.Single(response.Setups);
+        Assert.Equal(new DateOnly(2026, 1, 1), setup.ObservationDate);
+        Assert.Equal("TrendContinuation", setup.RuleName);
+    }
+
+    [Fact]
+    public async Task Setups_DeterministicAcrossRepeatedCalls()
+    {
+        SetupResolver();
+        await SeedEnrichedAsync(5, new DateOnly(2026, 1, 1), SourceAdapterType.Tgju);
+
+        var request = new StrategySetupsRequest
+        {
+            Instrument = "usd-irr",
+            Source = SourceAdapterType.Tgju,
+            From = new DateOnly(2026, 1, 1),
+            To = new DateOnly(2026, 1, 5)
+        };
+
+        var first = await _controller.GenerateSetups(request, CancellationToken.None);
+        var second = await _controller.GenerateSetups(request, CancellationToken.None);
+
+        var firstResponse = Assert.IsType<StrategySetupsResponse>(((OkObjectResult)first).Value);
+        var secondResponse = Assert.IsType<StrategySetupsResponse>(((OkObjectResult)second).Value);
+
+        Assert.Equal(
+            firstResponse.Setups.Select(s => s.SetupId),
+            secondResponse.Setups.Select(s => s.SetupId));
+        Assert.Equal(
+            firstResponse.Setups.Select(s => (s.ObservationDate, s.Direction, s.EntryCondition)),
+            secondResponse.Setups.Select(s => (s.ObservationDate, s.Direction, s.EntryCondition)));
+    }
+
+    [Fact]
+    public async Task Setups_UnknownRuleName_ReturnsInvalidRequest()
+    {
+        SetupResolver();
+        await SeedEnrichedAsync(3, new DateOnly(2026, 1, 1), SourceAdapterType.Tgju);
+
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest
+            {
+                Instrument = "usd-irr",
+                Source = SourceAdapterType.Tgju,
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 1, 3),
+                RuleNames = ["NoSuchSetupRule"]
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<StrategySetupsResponse>(ok.Value);
+        Assert.False(response.Ok);
+        Assert.Equal("INVALID_REQUEST", response.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Setups_SourcesRemainSeparate()
+    {
+        SetupResolver();
+        await SeedEnrichedAsync(5, new DateOnly(2026, 1, 1), SourceAdapterType.Tgju);
+
+        var result = await _controller.GenerateSetups(
+            new StrategySetupsRequest
+            {
+                Instrument = "usd-irr",
+                Source = SourceAdapterType.Nobitex,
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 1, 5)
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<StrategySetupsResponse>(ok.Value);
+        Assert.False(response.Ok);
+        Assert.Equal("NO_DATA", response.ErrorCode);
     }
 }

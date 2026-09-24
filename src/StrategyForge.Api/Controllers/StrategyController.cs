@@ -214,6 +214,47 @@ public class StrategyController : ControllerBase
     }
 
     /// <summary>
+    /// Generates deterministic strategy setups over the enriched historical dataset.
+    /// A setup is structured evidence — direction/bias, entry and invalidation
+    /// definitions, and risk metadata computed from stored indicator values.
+    /// It is never an instruction to trade and never LLM output.
+    /// </summary>
+    /// <param name="request">Setup request (instrument, source, range, rules).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Setup generation completed (check Ok in the body).</response>
+    /// <response code="400">Invalid request parameters.</response>
+    [HttpPost("setups")]
+    [ProducesResponseType(typeof(StrategySetupsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerateSetups(
+        [FromBody] StrategySetupsRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Instrument))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid Request",
+                Detail = "Instrument parameter is required.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        if (!request.Source.HasValue)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid Request",
+                Detail = "Source parameter is required (sources are never merged).",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var response = await _strategyAnalysisService.GenerateSetupsAsync(request, ct);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Computes the chronological Research / Validation / Holdout split of the
     /// enriched observations. Splitting is strictly positional (past → future);
     /// time-series data is never shuffled.

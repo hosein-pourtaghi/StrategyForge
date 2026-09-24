@@ -36,6 +36,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StrategyEvaluationEngine>(sp =>
             new StrategyEvaluationEngine(StrategyRuleRegistry.BuiltIn));
 
+        // --- Deterministic setup generation (Phase 8) ---
+        // Setup rules produce structured setup definitions (direction, entry,
+        // invalidation); the engine owns identity, provenance, and risk metadata.
+        services.AddSingleton<StrategySetupEngine>(sp =>
+            new StrategySetupEngine(SetupRuleRegistry.BuiltIn));
+
         // --- AI-ready dataset projection (Phase 9) ---
         // Registered behind Domain abstractions so Infrastructure depends on the
         // abstraction, not on this project (dependency inversion, IIndicatorEngine pattern).

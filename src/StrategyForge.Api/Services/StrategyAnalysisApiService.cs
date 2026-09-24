@@ -24,6 +24,7 @@ public sealed class StrategyAnalysisApiService
     private readonly IEnrichedDatasetStore _enrichedStore;
     private readonly IInstrumentResolver _instrumentResolver;
     private readonly StrategyEvaluationEngine _evaluationEngine;
+    private readonly StrategySetupEngine _setupEngine;
 
     /// <summary>Upper bound on observations loaded for one regime/evaluate/split call.</summary>
     public const int MaxObservations = 200_000;
@@ -31,11 +32,13 @@ public sealed class StrategyAnalysisApiService
     public StrategyAnalysisApiService(
         IEnrichedDatasetStore enrichedStore,
         IInstrumentResolver instrumentResolver,
-        StrategyEvaluationEngine evaluationEngine)
+        StrategyEvaluationEngine evaluationEngine,
+        StrategySetupEngine setupEngine)
     {
         _enrichedStore = enrichedStore;
         _instrumentResolver = instrumentResolver;
         _evaluationEngine = evaluationEngine;
+        _setupEngine = setupEngine;
     }
 
     /// <summary>
@@ -194,10 +197,75 @@ public sealed class StrategyAnalysisApiService
             MatchSamples = result.MatchSamples.Select(s => MapSample(
                 s, observations, result.RuleStatistics)).ToList()
         };
+    }    /// <summary>
+    /// Generates deterministic strategy setups over the enriched dataset.
+    /// </summary>
+    public async Task<StrategySetupsResponse> GenerateSetupsAsync(
+        StrategySetupsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (instrument, error) = await ResolveAsync(request.Instrument, cancellationToken);
+        if (instrument is null)
+        {
+            return SetupsError(request, error!);
+        }
+
+        var source = request.Source!.Value;
+        var (from, to, rangeError) = NormalizeRange(request.From, request.To);
+        if (rangeError is not null)
+        {
+            return SetupsError(request, rangeError);
+        }
+
+        var observations = await _enrichedStore.GetEnrichedAsync(
+            instrument.InstrumentId, source, from, to, 0, MaxObservations, cancellationToken);
+
+        if (observations.Count == 0)
+        {
+            return new StrategySetupsResponse
+            {
+                Ok = false,
+                InstrumentId = instrument.InstrumentId,
+                Source = source.ToString(),
+                From = from,
+                To = to,
+                ErrorCode = "NO_DATA",
+                ErrorMessage = "No enriched observations found for the requested instrument/source/range. " +
+                               "Run the historical processing pipeline first (POST /api/HistoricalProcessing/process)."
+            };
+        }
+
+        StrategySetupResult result;
+        try
+        {
+            result = _setupEngine.Generate(
+                observations,
+                instrument.InstrumentId,
+                source,
+                request.RuleNames is { Count: > 0 } ? request.RuleNames : null,
+                StrategyThresholds.Default);
+        }
+        catch (ArgumentException ex)
+        {
+            return SetupsError(request, ex.Message);
+        }
+
+        return new StrategySetupsResponse
+        {
+            Ok = true,
+            InstrumentId = result.InstrumentId,
+            Source = result.Source.ToString(),
+            From = result.From,
+            To = result.To,
+            ObservationsEvaluated = result.ObservationsEvaluated,
+            Setups = result.Setups.Select(MapSetup).ToList(),
+            SetupsPerRule = result.SetupsPerRule,
+            SkippedInsufficientEvidence = result.SkippedInsufficientEvidence
+        };
     }
 
     /// <summary>
-    /// Computes the chronological Research/Validation/Holdout split for the
+    /// Computes the chronological Research / Validation / Holdout split for the
     /// requested enriched observations.
     /// </summary>
     public async Task<SplitResponse> SplitAsync(
@@ -318,6 +386,55 @@ public sealed class StrategyAnalysisApiService
         Ok = false,
         InstrumentId = query.Instrument ?? "",
         Source = query.Source?.ToString() ?? "",
+        ErrorCode = message.Contains("No instrument found", StringComparison.Ordinal) ? "INSTRUMENT_NOT_FOUND" : "INVALID_REQUEST",
+        ErrorMessage = message
+    };
+
+    private static StrategySetupResponse MapSetup(StrategySetup setup) => new()
+    {
+        SetupId = setup.SetupId,
+        RuleName = setup.RuleName,
+        InstrumentId = setup.InstrumentId,
+        Source = setup.Source.ToString(),
+        ObservationDate = setup.ObservationDate,
+        Direction = setup.Direction.ToString(),
+        Regime = new RegimeSnapshotResponse
+        {
+            ObservationDate = setup.ObservationDate,
+            Trend = setup.Regime.Trend.ToString(),
+            Volatility = setup.Regime.Volatility.ToString(),
+            Momentum = setup.Regime.Momentum.ToString(),
+            Close = setup.Close
+        },
+        EntryCondition = setup.EntryCondition,
+        SupportingEvidence = setup.SupportingEvidence.Select(e => new StrategyEvidenceItemResponse
+        {
+            Name = e.Name,
+            Value = e.Value,
+            Comparison = e.Comparison
+        }).ToList(),
+        Invalidation = new SetupInvalidationResponse
+        {
+            Condition = setup.Invalidation.Condition,
+            FeatureNames = setup.Invalidation.FeatureNames,
+            ReferenceLevel = setup.Invalidation.ReferenceLevel
+        },
+        Risk = new SetupRiskResponse
+        {
+            Rsi = setup.Risk.Rsi,
+            PercentB = setup.Risk.PercentB,
+            BandwidthPercent = setup.Risk.BandwidthPercent,
+            CloseVsSmaPercent = setup.Risk.CloseVsSmaPercent,
+            Volatility = setup.Risk.Volatility.ToString()
+        },
+        ProcessedBy = setup.ProcessedBy
+    };
+
+    private static StrategySetupsResponse SetupsError(StrategySetupsRequest request, string message) => new()
+    {
+        Ok = false,
+        InstrumentId = request.Instrument ?? "",
+        Source = request.Source?.ToString() ?? "",
         ErrorCode = message.Contains("No instrument found", StringComparison.Ordinal) ? "INSTRUMENT_NOT_FOUND" : "INVALID_REQUEST",
         ErrorMessage = message
     };

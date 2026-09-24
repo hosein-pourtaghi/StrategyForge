@@ -158,6 +158,73 @@ var process = System.Diagnostics.Process.GetCurrentProcess();
 Console.WriteLine();
 Console.WriteLine($"PeakWorkingSet64: {process.PeakWorkingSet64:N0} bytes ({process.PeakWorkingSet64 / 1024.0 / 1024.0:N1} MiB)");
 
+// --- Phase 8 verification: deterministic setup generation over the stored dataset ---
+if (args.Contains("--setups"))
+{
+    using var setupsScope = provider.CreateScope();
+    var setupsScopeServices = setupsScope.ServiceProvider;
+    var enrichedStore = setupsScopeServices.GetRequiredService<StrategyForge.Domain.Interfaces.Providers.IEnrichedDatasetStore>();
+    var setupEngine = setupsScopeServices.GetRequiredService<StrategyForge.Analysis.Strategy.StrategySetupEngine>();
+    var resolver = setupsScopeServices.GetRequiredService<StrategyForge.Domain.Interfaces.Providers.IInstrumentResolver>();
+
+    var resolvedInstrument = await resolver.ResolveAsync(instrument)
+        ?? throw new InvalidOperationException($"Instrument '{instrument}' could not be resolved.");
+
+    var observations = await enrichedStore.GetEnrichedAsync(
+        resolvedInstrument.InstrumentId, source, from, to);
+
+    Console.WriteLine();
+    Console.WriteLine("--- Phase 8: deterministic setups (real stored dataset) ---");
+    Console.WriteLine($"  Observations loaded: {observations.Count}");
+
+    var setupsResult = setupEngine.Generate(
+        observations, resolvedInstrument.InstrumentId, source);
+
+    Console.WriteLine($"  Observations evaluated: {setupsResult.ObservationsEvaluated}");
+    Console.WriteLine($"  Setups generated:       {setupsResult.Setups.Count}");
+    foreach (var (rule, count) in setupsResult.SetupsPerRule)
+    {
+        Console.WriteLine($"    {rule}: {count}");
+    }
+
+    foreach (var (rule, count) in setupsResult.SkippedInsufficientEvidence)
+    {
+        Console.WriteLine($"    [skipped: insufficient evidence] {rule}: {count} observation(s)");
+    }
+
+    foreach (var setup in setupsResult.Setups.Take(5))
+    {
+        Console.WriteLine($"  · {setup.SetupId}");
+        Console.WriteLine($"      direction={setup.Direction}, close={setup.Close}, processedBy={setup.ProcessedBy}");
+        Console.WriteLine($"      entry: {setup.EntryCondition}");
+        Console.WriteLine($"      invalidation: {setup.Invalidation.Condition} (ref={setup.Invalidation.ReferenceLevel})");
+        Console.WriteLine($"      regime: trend={setup.Regime.Trend}, vol={setup.Regime.Volatility}, momentum={setup.Regime.Momentum}; risk: rsi={setup.Risk.Rsi}, %B={setup.Risk.PercentB}, bw%={setup.Risk.BandwidthPercent}");
+    }
+
+    var repeat = setupEngine.Generate(observations, resolvedInstrument.InstrumentId, source);
+    var identical = repeat.Setups.Count == setupsResult.Setups.Count
+        && Enumerable.Zip(repeat.Setups, setupsResult.Setups).All(p =>
+            p.First.SetupId == p.Second.SetupId
+            && p.First.EntryCondition == p.Second.EntryCondition
+            && p.First.ObservationDate == p.Second.ObservationDate
+            && p.First.Direction == p.Second.Direction);
+    Console.WriteLine($"  Determinism re-run:     {(identical ? "IDENTICAL" : "MISMATCH")}");
+
+    if (!args.Contains("--skip-setups-export"))
+    {
+        var setupsPath = Path.Combine(outputDir, "setups.json");
+        await File.WriteAllTextAsync(setupsPath,
+            System.Text.Json.JsonSerializer.Serialize(
+                setupsResult.Setups,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }));
+        Console.WriteLine($"  Exported: {Path.GetFullPath(setupsPath)}");
+    }
+}
+
 // --- Stored-row evidence: proves persistence + re-run idempotency (no duplicate rows) ---
 if (args.Contains("--db-stats"))
 {
